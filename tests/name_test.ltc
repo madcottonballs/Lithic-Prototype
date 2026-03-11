@@ -1,0 +1,6 @@
+let string welcome_message = "hello, welcome to the first proper program written in this language. What's your name?";
+printf(welcome_message);
+let string user_input = input();
+if (user_input) {
+    printf(stringConcat("Wow, ", user_input, " is such a lovely name!"));
+}
