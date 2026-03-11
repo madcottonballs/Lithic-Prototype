@@ -1,3 +1,5 @@
+"""This module contains the main evaluation loop for walking the token tree and reducing operations, as well as processing built-in functions."""
+
 from resolve_oper import *
 def _reduce_argument_value(argument, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn=None):
     """Reduce an argument token to a concrete runtime value token."""

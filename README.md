@@ -35,10 +35,12 @@ operators:
         
         "[integer var_ref]++":
             Increment operator adds 1 to the variable of type i32.
-            Ex: "x++"
+            Ex: 
+>               x++
         "[integer var_ref]--":
             Decrement operator subtracts 1 from the variable of type i32.
-            Ex: "x--"
+            Ex: 
+>               x--
         *"[integer var_ref]**":
             Double operator multiplies the variable of type i32 by 2.
             Ex: "x**"
@@ -84,19 +86,21 @@ Functions:
         *print([string | char]):
             Unformatted print. Sends the text entered to the terminal, with no extra characters.
             Ex: 
-                print('hello world\n'); 
+>               print('hello world\n'); 
 
         printf([string | char | i32 | array | boolean], [char]):
             Formatted print. Sends the text entered to the terminal. 
             Default end character automatically attached is the newline character.
             To change end character, pass in an optional 2nd argument.
-            Exs: 'printf("hello world")' 'printf("hello world", '\t')'
+            Exs: 
+>               printf("hello world") 
+>               printf("hello world", '\t')
         
         input():
             Pauses execution of the program to ask the user to enter text from the terminal.
             The text entered is returned to the functional call as a string.
             Ex:
-                printf( input() );
+>               printf( input() );
             This example will display the text the user just entered.
 
         *cmd([string]):

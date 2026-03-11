@@ -1,3 +1,5 @@
+"""This module turns raw token string literals into typed token nodes, which can then be used for type checking and evaluation. This also includes all LTC data types as token node classes, which can be used to store type information for type checking and evaluation purposes."""
+
 class token:
     def __init__(self, val):
         self.val = val
