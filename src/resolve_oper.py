@@ -1,3 +1,4 @@
+"""This module contains the logic for resolving operators. This includes both evaluating the operands and performing the operation itself. The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
 def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn=None):
     if isinstance(tokens[i], n.assign):
         stack_ptr = resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn)

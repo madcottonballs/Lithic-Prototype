@@ -1,5 +1,6 @@
-from typerizer import integer
-from noderizer_build_oper import *
+"""This module builds operator nodes for expressions, such as addition, subtraction, equality checks, etc. It also handles parsing of array type declarations and literals, as well as variable dereferencing."""
+from src.typerizer import integer
+from src.noderizer_build_oper import *
 
 class oper():
     def __init__(self, node1, node2):

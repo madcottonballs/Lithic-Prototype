@@ -1,3 +1,4 @@
+"""Initial entry point for text input. This file is responsible for converting raw source text into a list of tokens."""
 def lexer(source_text: str):
     # Build a token list from raw source characters.
     tokens: list = [""]

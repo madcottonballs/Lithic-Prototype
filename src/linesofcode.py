@@ -1,3 +1,4 @@
+"""A simple script to count the number of lines of code in this project, excluding comments and blank lines. This can be useful for tracking progress or estimating the size of the codebase."""
 from pathlib import Path
 
 

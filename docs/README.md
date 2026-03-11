@@ -249,16 +249,50 @@
 		Implictly adds 1 to this variable per loop.
 		Implictly checks if the variable is less than the 2nd argument every loop.
 		Implicit version of "for (let i32 x = 0, x < 10, x++) { ... }"
-		Ex: "iterate (x, 5) {}"
+		Ex: 
+```		
+			iterate (x, 5) {
+				printf(x);
+			} 
+			/* 
+			this code will output
+			0
+			1
+			2
+			3
+			4
+			/*
+```
 ##	while (boolean) { ... }
 		While the boolean is true, the code block will loop.
 		Boolean is checked at the start of each loop.
-		Ex "while (x < 5) { ... }"
+		Ex:
+```
+		let i32 x = 0;
+		while (x < 5) {
+			printf(x);
+			x++;
+		}
+			/* 
+			this code will output
+			0
+			1
+			2
+			3
+			4
+			/*		
+```
 ##	for ([let statement], [boolean], [var_ref][operator]) { ... }
 		Creates a new variable based on the let statement in the first argument.
 		Loops over the code in the block until the boolean is false.
 		Runs the operator on the variable referenced in the third argument during every pass.
-		Ex: "for (let i32 x = 0, x < 10, x++) { ... }" (creates 'x' variable, adds 1 to x every pass, until x reaches 10)
+		Ex: 
+```
+		for (let i32 x = 0, x < 10, x++) {
+			pass();
+		}
+ 		/* creates 'x' variable, adds 1 to x every pass, until x reaches 10. pass() does nothing. */ 	
+```
 ##	*enumerate ([let statement], [let statement], [array | string])
 		Creates a new variable from the first argument.
 		Every pass, the first variable is incremented. This variable is the index.
@@ -271,6 +305,8 @@
 		This can be referenced later in a goto() function.
 ##	*goto([label])
 		Jumps to the labeled line of code. There is no return.
+## 	*pass()
+		Does nothing.
 # Types
 *	All integer types are "true" when cast to boolean if they're not 0.
 *	When casted to char, returns the ascii

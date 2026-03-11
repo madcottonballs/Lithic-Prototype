@@ -1,6 +1,4 @@
-from unittest import case
-
-
+"""Helper functions for the interpreter, used across multiple modules. Source import is in main.py."""
 def create_frame(stack_frame: list[int], sp: int, namespace: list[dict[str, any]]):
     stack_frame.append(sp)
     namespace.append({})

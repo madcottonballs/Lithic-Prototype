@@ -1,0 +1,1 @@
+"""Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet."""
