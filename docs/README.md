@@ -11,7 +11,7 @@
 
 # Syntax Highlighting
 * There is support for syntax highlighting in VS code.
-* To add support to *your* VScode, paste the "ltc-syntax-highlighting" folder in this project into "C:\Users\madco\.vscode\extensions" and reload VScode.
+* To add support to *your* VScode, paste the "ltc-syntax-highlighting" folder in this project into "C:\Users\your user\.vscode\extensions" and reload VScode.
 
 # How to run
 >	.\Lithic filename.ltc
