@@ -11,7 +11,19 @@
 			"include": "#types"
 		},
 		{
+			"include": "#variables"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
 			"include": "#reserved-words"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#identifiers"
 		},
 		{
 			"include": "#operators"
@@ -23,8 +35,12 @@
 	"repository": {
 		"keywords": {
 			"patterns": [{
-				"name": "keyword.control",
+				"name": "keyword.control.flow",
 				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass)\\b"
+			},
+			{
+				"name": "storage.type.function",
+				"match": "\\b(define)\\b"
 			}]
 		},
 		"comments": {
@@ -39,7 +55,7 @@
 		"types": {
 			"patterns": [
 				{
-					"name": "storage.type",
+					"name": "support.type",
 					"match": "\\b(f64|i8|u8|i16|u16|i32|u32|i64|u64|ptr|array|label|char|boolean|string)\\b"
 				}
 			]
@@ -63,8 +79,34 @@
 		"reserved-words": {
 			"patterns": [
 				{
-					"name": "keyword.other",
-					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|let|typeof|sizeof|sConcat|aConcat|aLength|aSet)\\b"
+					"name": "storage.modifier.declaration",
+					"match": "\\b(let)\\b"
+				},
+				{
+					"name": "support.function.builtin",
+					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|typeof|sizeof|sConcat|aConcat|aLength|aSet)\\b"
+				}
+			]
+		},
+		"variables": {
+			"patterns": [
+				{
+					"comment": "Matches: let <type> <name> = ...",
+					"match": "\\b(let)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+					"captures": {
+						"1": { "name": "storage.modifier.declaration" },
+						"2": { "name": "support.type" },
+						"3": { "name": "variable.other.definition" }
+					}
+				}
+			]
+		},
+		"identifiers": {
+			"patterns": [
+				{
+					"comment": "Generic identifier usage (exclude keywords, types, and builtins).",
+					"name": "variable.other",
+					"match": "\\b(?!if\\b|else\\b|while\\b|for\\b|return\\b|iterate\\b|enumerate\\b|goto\\b|pass\\b|define\\b|let\\b|print\\b|printf\\b|input\\b|cmd\\b|inline_C\\b|inline_Asm\\b|inline_IR\\b|exit\\b|sLength\\b|typeof\\b|sizeof\\b|sConcat\\b|aConcat\\b|aLength\\b|aSet\\b|f64\\b|i8\\b|u8\\b|i16\\b|u16\\b|i32\\b|u32\\b|i64\\b|u64\\b|ptr\\b|array\\b|label\\b|char\\b|boolean\\b|string\\b)([A-Za-z_][A-Za-z0-9_]*)\\b(?!\\s*\\()"
 				}
 			]
 		},
@@ -83,7 +125,23 @@
 				]
 			}
 		]
-	}
+	},
+	"functions": {
+		"patterns": [
+			{
+			"comment": "Matches: define <name>(...)",
+			"match": "\\b(define)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+			"captures": {
+				"1": { "name": "storage.type.function" },
+				"2": { "name": "entity.name.function" }
+			}
+			},
+			{
+			"name": "entity.name.function",
+			"match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()"
+			}
+		]
+		}
 	},
 	"scopeName": "source.ltc"
 }

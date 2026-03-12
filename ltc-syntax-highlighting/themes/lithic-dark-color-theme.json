@@ -1,0 +1,82 @@
+{
+  "name": "Lithic Dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#121418",
+    "editor.foreground": "#E6E1D9",
+    "editorLineNumber.foreground": "#5E6773",
+    "editorLineNumber.activeForeground": "#A6AFBA",
+    "editor.selectionBackground": "#2A2F38",
+    "editor.inactiveSelectionBackground": "#1F242C",
+    "editorCursor.foreground": "#C9D2DD",
+    "editorIndentGuide.background": "#262B33",
+    "editorIndentGuide.activeBackground": "#3A424D"
+  },
+  "tokenColors": [
+    {
+      "scope": [
+        "comment",
+        "comment.block.ltc"
+      ],
+      "settings": {
+        "foreground": "#7E8A99",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": [
+        "string",
+        "string.quoted.double"
+      ],
+      "settings": {
+        "foreground": "#E0A84C"
+      }
+    },
+    {
+      "scope": [
+        "constant.numeric"
+      ],
+      "settings": {
+        "foreground": "#D27C7C"
+      }
+    },
+    {
+      "scope": [
+        "keyword.control",
+        "keyword.control.flow"
+      ],
+      "settings": {
+        "foreground": "#58A6FF",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": [
+        "keyword.other",
+        "storage.modifier.declaration",
+        "support.function.builtin",
+        "storage.type.function"
+      ],
+      "settings": {
+        "foreground": "#FFD54A",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": [
+        "keyword.operator"
+      ],
+      "settings": {
+        "foreground": "#C2B39A"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.function"
+      ],
+      "settings": {
+        "foreground": "#6FD0B4"
+      }
+    }
+  ]
+}

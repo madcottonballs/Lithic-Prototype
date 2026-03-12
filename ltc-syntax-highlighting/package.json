@@ -20,6 +20,11 @@
       "language": "ltc",
       "scopeName": "source.ltc",
       "path": "./syntaxes/ltc.tmLanguage.json"
+    }],
+    "themes": [{
+      "label": "Lithic Dark",
+      "uiTheme": "vs-dark",
+      "path": "./themes/lithic-dark-color-theme.json"
     }]
   }
 }

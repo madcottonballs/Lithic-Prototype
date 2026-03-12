@@ -1,6 +1,9 @@
-# ltc README
+# ltc
 
-This is the README for your extension "ltc". After writing up a brief description, we recommend including the following sections.
+Syntax highlighting for the Lithic programming language.
+
+## Theme
+To get the intended colors, select the `Lithic Dark` theme from the VS Code theme picker.
 
 ## Features
 

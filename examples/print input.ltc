@@ -10,4 +10,4 @@ while (user_input != "close") {
     let string user_input = input();
 }
 
-** identified bug: line 10 will not work with pure assignment, only initalization. unindentended behavior
+/* identified bug: line 10 will not work with pure assignment, only initalization. unindentended behavior */
