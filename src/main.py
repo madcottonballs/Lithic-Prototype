@@ -1,8 +1,8 @@
-import src.helper as helper
-import src.evaluator as evaluator
-import src.noderizer as noderizer
-import src.typerizer as t
-import src.tokenizer as tokenizer
+import helper as helper
+import evaluator as evaluator
+import noderizer as noderizer
+import typerizer as t
+import tokenizer as tokenizer
 
 
 def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, user_functions, return_values):

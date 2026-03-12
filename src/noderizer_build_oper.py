@@ -1,6 +1,6 @@
 """This module contains functions that build specific operator nodes during the noderization process. Each function corresponds to a specific operator and is responsible for transforming the relevant tokens into the appropriate node in the abstract syntax tree (AST). These functions are called by noderizer.py when it encounters the corresponding operators in the token stream."""
 # import * only brings functions from noderizer into this file
-import src.noderizer as n 
+import noderizer as n 
 
 def build_subexp(start_idx, tokens, helper, t, function_names, namespace, memory, user_functions, types):
     index = start_idx
