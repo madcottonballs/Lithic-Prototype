@@ -243,6 +243,7 @@ class user_function():
                 )
 
 def parser(tokens, namespace, helper, user_functions):
+    default_int = i32
     # Convert raw token strings into typed token nodes.
     for token_index, token_text in enumerate(tokens):
         is_int = True
@@ -284,7 +285,7 @@ def parser(tokens, namespace, helper, user_functions):
 
         # If all characters were digits, convert token to numeric node.
         if is_int:
-            tokens[token_index] = i32(token_text)
+            tokens[token_index] = default_int(token_text)
         
         # Default case: leave unknown identifiers/symbols as generic token nodes.
         if isinstance(tokens[token_index], str):
