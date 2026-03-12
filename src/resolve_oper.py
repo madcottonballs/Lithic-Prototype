@@ -191,10 +191,12 @@ def resolve_free_oper(tokens, i, t, helper, namespace, memory):
     del namespace[var_data[1]][var_name]
 
 def resolve_memloc_oper(tokens, i, t, helper, namespace, memory):
-    if not isinstance(tokens[i].node, t.var_ref):
-        raise TypeError(f"memloc operator must be a var_ref, not {type(tokens[i].node).__name__}")
+    obj = tokens[i].node
+    if not isinstance(obj, t.ltc_type | t.var_ref):
+        raise TypeError(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
+    if isinstance(obj, t.var_ref):
+        obj = helper.dereference_var(t, namespace, memory, obj)
+    if not obj.inmemory:
+        raise TypeError(f"Object '{obj.val}' of type '{type(obj).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")
 
-    var_name = tokens[i].node.val
-    var_data = helper.locate_var_in_namespace(namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
-    mem_addr = var_data[0]["addr"]
-    tokens[i] = t.i32(mem_addr)
+    tokens[i] = t.ptr(obj.memloc)

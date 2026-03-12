@@ -57,7 +57,7 @@
 ###		![boolean]
 			Inverts the boolean. false becomes true, true becomes false.
 ##	pointers:
-###		@[ptr]
+###		*@[ptr]
 			Dereferences a ptr.
 			Ex:
 ```

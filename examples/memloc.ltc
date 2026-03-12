@@ -1,5 +1,6 @@
 define main() { 
     let i32 x = 5;
-    printf(typeof(&x))
+    let ptr y = &x;
+    printf(@(y));
     return(0);
 }
