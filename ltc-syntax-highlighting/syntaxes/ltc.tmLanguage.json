@@ -1,0 +1,89 @@
+{
+	"name": "Lithic",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#types"
+		},
+		{
+			"include": "#reserved-words"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#numbers"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control",
+				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass)\\b"
+			}]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.block.ltc",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
+		"types": {
+			"patterns": [
+				{
+					"name": "storage.type",
+					"match": "\\b(f64|i8|u8|i16|u16|i32|u32|i64|u64|ptr|array|label|char|boolean|string)\\b"
+				}
+			]
+		},
+		"operators": {
+			"patterns": [
+				{
+					"name": "keyword.operator",
+					"match": "\\+|\\-|\\*|\\/|%|==|!=|<=|>=|<|>|&|@|\\+\\+|\\-\\-|\\$|\\~|->|\\^|!|\\*\\*|\\/\\/|\\|\\||=|\\+=|\\-=|\\*=|\\/="
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"name": "constant.numeric",
+					"match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b"
+				}
+			]
+		},
+		"reserved-words": {
+			"patterns": [
+				{
+					"name": "keyword.other",
+					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|let|typeof|sizeof|sConcat|aConcat|aLength|aSet)\\b"
+				}
+			]
+		},
+
+	"strings": {
+		"patterns": [
+			{
+				"name": "string.quoted.double",
+				"begin": "\"",
+				"end": "\"",
+				"patterns": [
+					{
+						"name": "constant.character.escape",
+						"match": "\\\\."
+					}
+				]
+			}
+		]
+	}
+	},
+	"scopeName": "source.ltc"
+}

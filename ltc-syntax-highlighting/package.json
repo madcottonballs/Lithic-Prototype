@@ -1,0 +1,25 @@
+{
+  "name": "ltc",
+  "displayName": "ltc",
+  "description": "Syntax highlighting for the Lithic programming language.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.111.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "ltc",
+      "aliases": ["Lithic", "ltc"],
+      "extensions": [".ltc"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "ltc",
+      "scopeName": "source.ltc",
+      "path": "./syntaxes/ltc.tmLanguage.json"
+    }]
+  }
+}
