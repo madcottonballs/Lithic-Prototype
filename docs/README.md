@@ -66,6 +66,7 @@
 				printf(@y)		*/ output: 5 /*
 ```
 ###		*&[any]
+			Memloc operator.
 			Retrieves the address of the object in memory.
 			Only works on data stored in memory (like variables), not literals.
 			Ex:

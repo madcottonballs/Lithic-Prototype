@@ -52,6 +52,8 @@ def add_string_to_memory(string, memory, sp) -> int:
     """Returns the new stack pointer after writing the string to memory.
     \n Ensure you write sp = add_string_to_memory(...) when calling this function, to update the stack pointer for the next write."""
     byte_rep_of_str = string.val.encode('utf-8') + b'\x00' # null-terminated string
+    string.inmemory = True
+    string.memloc = sp
     memory[sp:sp + len(byte_rep_of_str)] = byte_rep_of_str
     return sp + len(byte_rep_of_str)
 
@@ -310,18 +312,34 @@ def dereference_var(t, namespace, memory, var_ref_token):
         case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
             class_ref = t.__dict__[var_type]                        # gathers the class reference for the variable type (e.g. t.i32) from the main.py typerizer dict, so that we can call its read_from_memory method to get the value from memory and return it as an object of the correct type.
             temp_instance = class_ref(0)                        # create a temporary instance of the variable type (e.g. t.i32(0)) just to call the read_from_memory method and return the correctly typed value from memory, since we can't call read_from_memory directly on the class reference.
-            return temp_instance.read_from_memory(memory, addr)     # call the read_from_memory method of the correct type class to read the value from memory and return it as an object of the correct type (e.g. t.i32)
+            temp_instance.read_from_memory(memory, addr)     # call the read_from_memory method of the correct type class to read the value from memory and return it as an object of the correct type (e.g. t.i32)
+            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            return temp_instance
         case "string":
             end = addr
             while end < len(memory) and memory[end] != 0:
                 end += 1
-            return t.string(memory[addr:end].decode("utf-8"))
+            temp_instance = t.string(memory[addr:end].decode("utf-8"))
+            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            return temp_instance
         case "char":
-            return t.char(chr(memory[addr]))
+            temp_instance = t.char(chr(memory[addr]))
+            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            return temp_instance
         case "boolean":
-            return t.boolean(memory[addr] != 0)
+            temp_instance = t.boolean(memory[addr] != 0)
+            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            return temp_instance
         case "ptr":
-            return t.ptr(0).read_from_memory(memory, addr)
+            temp_instance = t.ptr(0)                          # create a temporary instance of the ptr type just to call the read_from_memory method and return the correctly typed value from memory, since we can't call read_from_memory directly on the class reference.
+            temp_instance.read_from_memory(memory, addr)
+            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            return temp_instance
         case "array":
             elem_type = var_meta["elem_type"]
             length = var_meta["length"]
@@ -341,6 +359,8 @@ def dereference_var(t, namespace, memory, var_ref_token):
 
             array_obj = t.array(values, arrayType=elem_type, parse=False)
             array_obj.size = length
+            array_obj.inmemory = True                     # mark the array object as inmemory (used for memloc oper)
+            array_obj.memloc = addr                       # store the memory address in the array object (used for memloc oper)
             return array_obj
         case _:
             raise TypeError(f"Unsupported variable type: {var_type}")

@@ -1,32 +1,40 @@
-"""This module contains the logic for resolving operators. This includes both evaluating the operands and performing the operation itself. The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
+"""This module contains the logic for resolving operators. 
+This includes both evaluating the operands and performing the operation itself. 
+The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. 
+If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
 def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn=None):
-    if isinstance(tokens[i], n.assign):
-        stack_ptr = resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.equal):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "==", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.not_equal):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "!=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.gtr_than):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.less_than):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.gtr_than_or_equal):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.less_than_or_equal):
-        resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.invert):
-        resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
-        return True, stack_ptr
-    if isinstance(tokens[i], n.free):
-        resolve_free_oper(tokens, i, t, helper, namespace, memory)
-        return True, stack_ptr
+    if isinstance(tokens[i], n.mono_oper):
+        if isinstance(tokens[i], n.invert):
+            resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        elif isinstance(tokens[i], n.free):
+            resolve_free_oper(tokens, i, t, helper, namespace, memory)
+            return True, stack_ptr
+        elif isinstance(tokens[i], n.memloc):
+            resolve_memloc_oper(tokens, i, t, helper, namespace, memory)
+            return True, stack_ptr
+    elif isinstance(tokens[i], n.oper):
+        if isinstance(tokens[i], n.assign):
+            stack_ptr = resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.equal):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "==", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.not_equal):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "!=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.gtr_than):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.less_than):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.gtr_than_or_equal):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
+        if isinstance(tokens[i], n.less_than_or_equal):
+            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            return True, stack_ptr
 
     if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.integer):
         if type(tokens[i].node1) != type(tokens[i].node2):
@@ -181,3 +189,12 @@ def resolve_free_oper(tokens, i, t, helper, namespace, memory):
     tokens[i] = helper.dereference_var(t, namespace, memory, tokens[i].node)
     var_data = helper.locate_var_in_namespace(namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
     del namespace[var_data[1]][var_name]
+
+def resolve_memloc_oper(tokens, i, t, helper, namespace, memory):
+    if not isinstance(tokens[i].node, t.var_ref):
+        raise TypeError(f"memloc operator must be a var_ref, not {type(tokens[i].node).__name__}")
+
+    var_name = tokens[i].node.val
+    var_data = helper.locate_var_in_namespace(namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
+    mem_addr = var_data[0]["addr"]
+    tokens[i] = t.i32(mem_addr)

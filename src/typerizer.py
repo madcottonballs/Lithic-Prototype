@@ -3,19 +3,28 @@
 class token:
     def __init__(self, val):
         self.val = val
-    
-class string(token):
-    def __init__(self, val):
-        self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
-class char(token):
-    def __init__(self, val):
-        self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
-class boolean(token):
-    pass
 
-class array(token):
-    def __init__(self, val, arrayType=None, parse=True):
+class ltc_type(token):  # base class for all LTC data types. This is used to distinguish between syntax tokens and typed tokens
+    def __init__(self, val):
         self.val = val
+        self.inmemory = False
+        self.memloc = None
+
+class string(ltc_type):
+    def __init__(self, val):
+        super().__init__(val)
+        self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
+class char(ltc_type):
+    def __init__(self, val):
+        super().__init__(val)
+        self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
+class boolean(ltc_type):
+    def __init__(self, val):
+        super().__init__(val)
+
+class array(ltc_type):
+    def __init__(self, val, arrayType=None, parse=True):
+        super().__init__(val)
         self.arrayType = arrayType
         self.parsed = not parse
         if parse:
@@ -98,8 +107,9 @@ class function(token):
 
 # integer types are all stored as the same integer node, but can be tagged with their specific type for type checking purposes.
 
-class integer(token):
+class integer(ltc_type):
     def __init__(self, val):
+        super().__init__(val)
         # Store numeric literals as numbers, not strings.
         if isinstance(val, str):
             self.val = int(val)

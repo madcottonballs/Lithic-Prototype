@@ -206,3 +206,10 @@ def build_cast_oper(t, tokens, index, types: dict[str, type]):
     
     cast_node = t.function("cast", [tokens[index - 1], t.token(","), type_token]) # turns the operator into a function call like cast(x, i32)
     tokens[index - 1:index + 3] = [cast_node]
+    
+def build_memloc_oper(tokens, index):
+    if index >= len(tokens):
+        raise SyntaxError("Tried to call a memloc operator without a following object to take the memloc of")
+    
+    new_node = n.memloc(tokens[index + 1])
+    tokens[index:index + 2] = [new_node]

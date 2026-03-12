@@ -14,15 +14,10 @@ class increment(oper):
 class decrement(oper):
     pass
 
-class mono_oper():
-    def __init__(self, node):
-        self.node = node
 
 class equal(oper):
     pass
 class not_equal(oper):
-    pass
-class invert(mono_oper):
     pass
 class gtr_than(oper):
     pass
@@ -33,7 +28,14 @@ class gtr_than_or_equal(oper):
 class less_than_or_equal(oper):
     pass
 
+class mono_oper():
+    def __init__(self, node):
+        self.node = node
+class invert(mono_oper):
+    pass
 class free(mono_oper):
+    pass
+class memloc(mono_oper):
     pass
 
 class mult(oper):
@@ -468,6 +470,8 @@ def _build_opers(t, function_names, helper, tokens, namespace, memory, start_idx
                         pass # handled at a different time
             case "^":
                 build_free_oper(tokens, index)
+            case "&":
+                build_memloc_oper(tokens, index)
         index += 1
 
 def _check_oper_syntax_errors(oper: str, tokens, index):
