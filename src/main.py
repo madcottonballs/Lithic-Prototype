@@ -207,12 +207,14 @@ function_names = [
     "aConcat",
     "aSet",
     "return",
-    "cast"
+    "cast",
+    "malloc",
+    "coredump"
 ]
 
 
-def main(raw_source: str) -> int:
-    memory = bytearray(1024)
+def main(raw_source: str, memory_size: int=1024) -> int:
+    memory = bytearray(memory_size)
     namespace: list[dict[str, any]] = [{}] # global scope is the first dict in the list; new dicts are pushed for new scopes. Each dict maps variable names to {"type": type_name, "address": mem_address} entries.
     types = {
         "string": t.string,
@@ -248,7 +250,15 @@ import sys
 if __name__ == "__main__":
     with open(sys.argv[1], "r") as f:
         raw_source = f.read()
-    print("===OUTPUT===")
-    return_values = main(raw_source)
+    if len(sys.argv) == 3: # custom bytearray initalize size
+        memory_size = int(sys.argv[2])
+        if memory_size <= 0:
+            print("Memory size must be a positive integer")
+            sys.exit(1)
+        print("===OUTPUT===")
+        return_values = main(raw_source, memory_size)
+    else:
+        print("===OUTPUT===")
+        return_values = main(raw_source)
     #print(return_values)
 

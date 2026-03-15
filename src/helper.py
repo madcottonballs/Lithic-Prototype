@@ -550,3 +550,13 @@ def _get_user_function_meta(user_functions, function_name: str) -> tuple[list[st
         raise SyntaxError(f"Function '{function_name}' has mismatched arg type/name metadata")
     return arg_types, arg_names, body
 
+def malloc(memory: bytearray, size: int, stack_ptr: int) -> tuple[int, int]:
+    """Reserves memory. Returns [new sp, starting address of the allocated block]."""
+    sp = stack_ptr # make it mutable
+
+    if sp + size > len(memory):
+        raise MemoryError("Out of memory")
+    
+    allocated_address = sp
+    sp += size
+    return sp, allocated_address

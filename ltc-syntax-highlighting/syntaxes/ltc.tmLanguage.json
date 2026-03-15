@@ -84,7 +84,7 @@
 				},
 				{
 					"name": "support.function.builtin",
-					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|typeof|sizeof|sConcat|aConcat|aLength|aSet)\\b"
+					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|typeof|sizeof|sConcat|aConcat|aLength|aSet|malloc)\\b"
 				}
 			]
 		},

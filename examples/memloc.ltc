@@ -1,6 +1,7 @@
 define main() { 
     let i32 x = 5;
-    let ptr y = &x;
+    let ptr y = malloc(10);
     printf(y);
+    coredump();
     return(0);
 }

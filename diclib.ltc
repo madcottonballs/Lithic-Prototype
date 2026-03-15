@@ -1,0 +1,6 @@
+/*
+The dictlib uses a memory structure like this:
+[u8 size][ptr key][ptr value][ptr key][ptr value]...
+*/
+
+define 

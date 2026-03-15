@@ -299,6 +299,25 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
         
         case "cast":
             resolve_cast_function(tokens, i, t, helper)
+        
+        case "malloc":
+            if len(tokens[i].args) != 1:
+                raise SyntaxError("malloc expects exactly one argument")
+            arg = tokens[i].args[0]
+            if not isinstance(arg, t.i32):
+                raise TypeError(f"malloc size argument must be an i32, got {type(arg).__name__}")
+            
+            malloc_returns = helper.malloc(memory, arg.val, sp) # returns [new sp, starting address of the allocated block]
+            sp = malloc_returns[0]
+            tokens[i] = t.ptr(malloc_returns[1]) 
+        
+        case "coredump":
+            if len(tokens[i].args) != 0:
+                raise SyntaxError("coredump does not take any arguments")
+            # this will eventually dump the entire memory, stack, and namespace state to a file for debugging, but for now it just prints the current stack pointer and return values to the console.
+            print("===CORE DUMP===")
+            print(f"Stack Pointer: {sp}")
+            print(f"memory: {memory}")
 
     return sp, return_values
 
