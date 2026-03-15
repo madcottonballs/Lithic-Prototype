@@ -1,9 +1,9 @@
-import helper as helper
+import helper
 import evaluator as evaluator
 import noderizer as noderizer
 import typerizer as t
 import tokenizer as tokenizer
-
+import preproccesor
 
 def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, user_functions, return_values):
     """Execute one non-control-flow statement and return updated stack pointer."""
@@ -47,7 +47,9 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
         raise SyntaxError("Expected function name after define")
 
     name_end = name_start
-    while name_end < len(source_text) and (source_text[name_end].isalnum() or source_text[name_end] == "_"):
+    while name_end < len(source_text) and (
+        source_text[name_end].isalnum() or source_text[name_end] in {"_", "."}
+    ):
         name_end += 1
 
     function_name = source_text[name_start:name_end].strip()
@@ -56,7 +58,7 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
 
     header_open_index = helper.skip_whitespace(source_text, name_end)
     if header_open_index >= len(source_text) or source_text[header_open_index] != "(":
-        raise SyntaxError("Expected '(' after function name")
+        raise SyntaxError(f"Expected '(' after function name, instead got '{source_text[header_open_index]}'")
 
     header_close_index = helper.find_matching(source_text, header_open_index, "(", ")")
     header_text = source_text[header_open_index + 1:header_close_index].strip()
@@ -89,6 +91,7 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
     \n Returns updated sp and optionally return value(s) if executing a function body."""
     source_text = helper.strip_comments(source_text)
+    source_text = preproccesor.process_imports(source_text)
     cursor = 0
     source_length = len(source_text)
 

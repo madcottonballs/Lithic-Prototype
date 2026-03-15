@@ -36,7 +36,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.flow",
-				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass)\\b"
+				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass|import)\\b"
 			},
 			{
 				"name": "storage.type.function",
