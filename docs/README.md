@@ -165,7 +165,7 @@
 >				sConcat("hello ", "world ", "it's a lovely day!")	/* This would return the string "hello world it's a lovely day!" */
 
 		
-###		aConcat([array], [array]):
+###		aConcat([array], [array])
 			All arguments must be arrays.
 			Must be >= 2 arguments.
 			All arrays passed in must be of the same type (ex.: i32[])
@@ -173,16 +173,16 @@
 			Ex:
 > 				aConcat([3, 2], [9, 21, 4], [2, 9]) 		/* This would return the array [3, 2, 9, 21, 4, 2, 9]. */
 
-###		aLength([array]):
+###		aLength([array])
 			Returns the number (i32) of elements in the array passed in.
 		
-###		aSet([array], [i32], [any]):
+###		aSet([array], [i32], [any])
 			Indexed array element reassignment.
 			The first argument is a reference to a array.
 			The second argument is the index of where the new value must replace existing data.
 			The third argument is the new object replacing the old. 
 
-###		cast([any], [type]):
+###		cast([any], [type])
 			Equivalent to the cast operator.
 			Cast function converts the first obj into the type referenced.
 			Ex: 
@@ -241,6 +241,18 @@
 					All characters in the string must be a digit.
 					For example, the string "273" can turn to a u64 (and so can be a ptr), but the string "hello" cannot turn to a ptr type.
 
+### 	malloc([i32])
+			Reserves a block of memory in the stack for the programmer to use.
+			The size of this new memory is determined by the argument passed in.
+			Returns a ptr to the first byte of this block.
+			In the interpreted version, if you allocate beyond the range of the virtual memory, it currently throws an error. Eventually *dynamic expansion will be supported.
+			Ex:
+>				let ptr x = malloc(5);
+			This reserves 5 bytes for the programmer to use, x is a ptr to the first byte.
+
+###		coredump()
+			In interprter version, currently prints the sp and virtual memory contents.
+			Will eventually dump to a *file in both versions.
 
 # Control Flow:
 ##	if ([boolean]) { ... }
