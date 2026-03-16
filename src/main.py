@@ -5,17 +5,17 @@ import typerizer as t
 import tokenizer as tokenizer
 import preproccesor
 
-def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, user_functions, return_values):
+def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, hp, user_functions, return_values):
     """Execute one non-control-flow statement and return updated stack pointer."""
     stmt = stmt.strip()
     if not stmt:
-        return sp, return_values
+        return sp, return_values, hp
 
     tokens = tokenizer.lexer(stmt)
     t.parser(tokens, namespace, helper, user_functions)
     noderizer.generate_trees(t, function_names, helper, tokens, namespace, memory, user_functions, types, 0)
-    sp, return_values = evaluator.evaluate(tokens, memory, namespace, types, noderizer, t, helper, user_functions, stack_frames, return_values, sp, execute_source)
-    return sp, return_values
+    sp, return_values, hp = evaluator.evaluate(tokens, memory, namespace, types, noderizer, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source)
+    return sp, return_values, hp
 
 def evaluate_condition(condition_expr: str, memory, namespace, types, sp, user_functions, stack_frames) -> tuple[bool, int]:
     """Evaluate condition expression; return (bool_result, updated_sp)."""
@@ -86,8 +86,7 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
 
     return function_name, arg_types, arg_names, function_body, block_close_index + 1
 
-
-def execute_source(source_text: str, memory, namespace, types, stack_frame: list[int], sp: int, functions: dict[str, list], return_values) -> (int | list):
+def execute_source(source_text: str, memory, namespace, types, stack_frame: list[int], sp: int, hp: int, functions: dict[str, list], return_values) -> (int | list):
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
     \n Returns updated sp and optionally return value(s) if executing a function body."""
     source_text = helper.strip_comments(source_text)
@@ -128,17 +127,17 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
             iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor)
 
             helper.create_frame(stack_frame, sp, namespace)
-            sp, return_values = execute_statement(f"let i32 {iterator_name} = 0", memory, namespace, types, stack_frame, sp, functions, return_values)
+            sp, return_values = execute_statement(f"let i32 {iterator_name} = 0", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
 
             condition_true, sp = evaluate_condition(f"{iterator_name} < {end_value}", memory, namespace, types, sp, functions, stack_frame)
             while condition_true:
                 helper.create_frame(stack_frame, sp, namespace)
-                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
-                sp, return_values = execute_statement(f"{iterator_name}++", memory, namespace, types, stack_frame, sp, functions, return_values)
+                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                sp, return_values = execute_statement(f"{iterator_name}++", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                 sp = helper.destroy_frame(stack_frame, namespace)
                 condition_true, sp = evaluate_condition(f"{iterator_name} < {end_value}", memory, namespace, types, sp, functions, stack_frame)
 
-            sp, return_values = execute_statement(f"{iterator_name}^", memory, namespace, types, stack_frame, sp, functions, return_values)
+            sp, return_values = execute_statement(f"{iterator_name}^", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
             sp = helper.destroy_frame(stack_frame, namespace)
 
             cursor = next_cursor
@@ -148,13 +147,13 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
             init_statement, condition_expression, step_statement, block_source, next_cursor = helper.parse_for_block(source_text, cursor)
 
             helper.create_frame(stack_frame, sp, namespace)
-            sp, return_values = execute_statement(init_statement, memory, namespace, types, stack_frame, sp, functions, return_values)
+            sp, return_values = execute_statement(init_statement, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
 
             condition_true, sp = evaluate_condition(condition_expression, memory, namespace, types, sp, functions, stack_frame)
             while condition_true:
                 helper.create_frame(stack_frame, sp, namespace)
-                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
-                sp, return_values = execute_statement(step_statement, memory, namespace, types, stack_frame, sp, functions, return_values)
+                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                sp, return_values = execute_statement(step_statement, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                 sp = helper.destroy_frame(stack_frame, namespace)
                 condition_true, sp = evaluate_condition(condition_expression, memory, namespace, types, sp, functions, stack_frame)
 
@@ -173,29 +172,32 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
                 else_block_source, after_else_cursor = helper.parse_else_block(source_text, else_cursor)
                 if condition_true:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
+                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 else:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(else_block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
+                    sp, return_values = execute_source(else_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 cursor = after_else_cursor
             else:
                 if condition_true:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
+                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 cursor = next_cursor
             continue
 
         statement_text, cursor = helper.read_statement(source_text, cursor)
         if statement_text:
-            sp, return_values = execute_statement(statement_text, memory, namespace, types, stack_frame, sp, functions, return_values)
+            sp, return_values, hp = execute_statement(statement_text, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
 
         if cursor < source_length and (source_text[cursor] == ";" or source_text[cursor] == "}"):
             cursor += 1
 
-    return sp, return_values
+    if hp <= sp:    # cannot check only during growth because of the pain of adding hp checks to every statement execution - easier to just check at the end of each statement execution. This also allows detection of stack/heap intersection caused by things like user-defined functions that manipulate the stack pointer directly.
+        raise MemoryError("Stack and Heap intersect. Out of memory.")
+
+    return sp, return_values, hp
 
 
 function_names = [
@@ -236,16 +238,13 @@ def main(raw_source: str, memory_size: int=1024) -> int:
     }
 
     sp = 0
+    hp = memory_size - 1
     stack_frame: list[int] = []
     user_functions: dict[str, dict[str, object]] = {} # maps function names to {"arg_types": [...], "arg_names": [...], "body": "..."}
-    sp, return_values = execute_source(raw_source + "\nmain();", memory, namespace, types, stack_frame, sp, user_functions, return_values=[])
+    sp, return_values, hp = execute_source(raw_source + "\nmain();", memory, namespace, types, stack_frame, sp, hp, user_functions, return_values=[])
     if return_values == None:
         raise RuntimeError("Program did not return a value")
     return return_values[0] if len(return_values) == 1 else return_values
-    #print("---DEBUG---")
-    #print("Memory contents:", memory[0:40])
-    #print("Namespace:", namespace)
-    #print("Functions:", user_functions)
 
 
 import sys

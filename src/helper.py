@@ -378,6 +378,7 @@ def integer_type_to_size(type_name: str) -> int:
             return 8
         case _:
             raise ValueError(f"Unknown integer type: {type_name}")
+
 def integer_type_to_signedness(type_name: str) -> bool:
     """Helper function to determine if an integer type is signed."""
     match type_name:
@@ -550,13 +551,13 @@ def _get_user_function_meta(user_functions, function_name: str) -> tuple[list[st
         raise SyntaxError(f"Function '{function_name}' has mismatched arg type/name metadata")
     return arg_types, arg_names, body
 
-def malloc(memory: bytearray, size: int, stack_ptr: int) -> tuple[int, int]:
+def malloc(size: int, heap_ptr: int, sp: int) -> tuple[int, int]:
     """Reserves memory. Returns [new sp, starting address of the allocated block]."""
-    sp = stack_ptr # make it mutable
+    hp = heap_ptr # make it mutable
 
-    if sp + size > len(memory):
-        raise MemoryError("Out of memory")
+    if hp - size <= sp:
+        raise MemoryError("Heap grew into stack. Out of memory.")
     
-    allocated_address = sp
-    sp += size
-    return sp, allocated_address
+    hp -= size
+    allocated_address = hp
+    return hp, allocated_address

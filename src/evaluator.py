@@ -1,18 +1,18 @@
 """This module contains the main evaluation loop for walking the token tree and reducing operations, as well as processing built-in functions."""
 
 from resolve_oper import *
-def _reduce_argument_value(argument, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn=None):
+def _reduce_argument_value(argument, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn=None):
     """Reduce an argument token to a concrete runtime value token."""
     value = argument
 
     if isinstance(value, n.oper | n.mono_oper | n.subexp | n.add | n.sub | n.mult | n.div | t.function | t.user_function):
         temp = [value]
-        sp, return_values = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+        sp, return_values, hp = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
         value = temp[0]
     elif isinstance(value, t.var_ref):
         value = helper.dereference_var(t, namespace, memory, value)
 
-    return value, sp, return_values
+    return value, sp, return_values, hp
 
 def _bind_user_function_args(call_node, arg_types, arg_names, memory, namespace, types, t, helper, sp):
     """Load user-function arguments into the current frame namespace."""
@@ -29,12 +29,13 @@ def _bind_user_function_args(call_node, arg_types, arg_names, memory, namespace,
 
     return sp
 
-def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values=None, stack_ptr=0, execute_source_fn=None):
+def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values=None, stack_ptr=0, heap_ptr=0, execute_source_fn=None):
     """Walk the tree/list and reduce operations. Returns updated stack pointer."""
     if return_values is None:
         return_values = []
 
     sp = stack_ptr
+    hp = heap_ptr
     i = 0
     while i < len(tokens):
         if isinstance(tokens[i], n.oper | n.mono_oper):
@@ -43,7 +44,7 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                 continue
 
         if isinstance(tokens[i], n.subexp):
-            sp, return_values = evaluate(tokens[i].val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+            sp, return_values, hp = evaluate(tokens[i].val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
             if len(tokens[i].val) != 1:
                 raise TypeError(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
@@ -55,20 +56,20 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                     tokens[i].args[arg_idx] = arg_val
                     continue
 
-                reduced, sp, return_values = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
                 # Do not force all function args to be runtime values here.
                 # `let` intentionally carries identifier/operator tokens through to function_processing.
                 tokens[i].args[arg_idx] = reduced
-            sp, return_values = function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, sp)
+            sp, return_values, hp = function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, sp, hp)
             if isinstance(tokens[i], t.function) and tokens[i].val == "return":
-                return sp, return_values
+                return sp, return_values, hp
 
         if isinstance(tokens[i], t.user_function): # resolves user function calls
             if execute_source_fn is None:
                 raise RuntimeError("user_function execution requires execute_source_fn")
 
             for arg_idx, arg_val in enumerate(tokens[i].arguments):
-                reduced, sp, return_values = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
                 tokens[i].arguments[arg_idx] = reduced
 
             tokens[i].validate_args(user_functions)
@@ -77,7 +78,7 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
             helper.create_frame(stack_frames, sp, namespace)
             sp = _bind_user_function_args(tokens[i], arg_types, arg_names, memory, namespace, types, t, helper, sp)
             local_returns = []
-            sp, local_returns = execute_source_fn(body_source, memory, namespace, types, stack_frames, sp, user_functions, local_returns)
+            sp, local_returns, hp = execute_source_fn(body_source, memory, namespace, types, stack_frames, sp, hp, user_functions, local_returns)
             sp = helper.destroy_frame(stack_frames, namespace)
 
             if local_returns:
@@ -87,11 +88,12 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
 
         i += 1
 
-    return sp, return_values
+    return sp, return_values, hp
 
-def function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, stack_ptr) -> tuple[int, list]:
+def function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, stack_ptr, heap_ptr) -> tuple[int, list]:
     """Process built-ins and return updated stack pointer."""
     sp = stack_ptr
+    hp = heap_ptr
     match tokens[i].val:
         case "printf":
             if len(tokens[i].args) != 1:
@@ -306,11 +308,11 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
             if len(tokens[i].args) != 1:
                 raise SyntaxError("malloc expects exactly one argument")
             arg = tokens[i].args[0]
-            if not isinstance(arg, t.i32):
-                raise TypeError(f"malloc size argument must be an i32, got {type(arg).__name__}")
+            if not isinstance(arg, t.integer):
+                raise TypeError(f"malloc size argument must be an integer, got {type(arg).__name__}")
             
-            malloc_returns = helper.malloc(memory, arg.val, sp) # returns [new sp, starting address of the allocated block]
-            sp = malloc_returns[0]
+            malloc_returns = helper.malloc(arg.val, hp, sp) # returns [new hp, starting address of the allocated block]
+            hp = malloc_returns[0]
             tokens[i] = t.ptr(malloc_returns[1]) 
         
         case "coredump":
@@ -319,13 +321,20 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
             with open("coredump.txt", "w") as f:
                 f.write("===CORE DUMP===\n")
                 f.write(f"Stack Pointer: {sp}\n===============================\n")
+                f.write(f"Heap Pointer: {hp}\n===============================\n")
                 f.write("memory:\n")
                 for i, v in enumerate(memory):
-                    f.write(f"  [{i}]: {v}\n")
+                    if i == sp:
+                        f.write(f"  [{i}]: {v}  <-- SP\n")
+                    elif i == hp:
+                        f.write(f"  [{i}]: {v}  <-- HP\n")
+                    else:
+                        f.write(f"  [{i}]: {v}\n")
                 f.write(f"===============================\n")
                 f.write(f"namespace: {namespace}\n")
             f.close()
-    return sp, return_values
+
+    return sp, return_values, hp
 
 def resolve_cast_function(tokens: list, i: int, t: object, helper: object):
     if len(tokens[i].args) != 2:
