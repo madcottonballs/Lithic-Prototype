@@ -321,6 +321,9 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names
             return False
 
         # Delimiters/operators indicate a new expression segment.
+        if not isinstance(previous_symbol, str):
+            return True
+
         return previous_symbol in {"(", "[", "{", ",", "=", "+", "-", "*", "/", "%", "!", "<", ">", "->"}
 
     # Pass 3: build multiplication/division nodes first (higher precedence).

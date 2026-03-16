@@ -44,7 +44,9 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
 
         if isinstance(tokens[i], n.subexp):
             sp, return_values = evaluate(tokens[i].val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
-            tokens[i] = t.i32(tokens[i].val)
+            if len(tokens[i].val) != 1:
+                raise TypeError("Sub-expression did not reduce to a single value")
+            tokens[i] = tokens[i].val[0]
 
         if isinstance(tokens[i], t.function):
             for arg_idx, arg_val in enumerate(tokens[i].args):
@@ -314,11 +316,12 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
         case "coredump":
             if len(tokens[i].args) != 0:
                 raise SyntaxError("coredump does not take any arguments")
-            # this will eventually dump the entire memory, stack, and namespace state to a file for debugging, but for now it just prints the current stack pointer and return values to the console.
-            print("===CORE DUMP===")
-            print(f"Stack Pointer: {sp}")
-            print(f"memory: {memory}")
-
+            with open("coredump.txt", "w") as f:
+                f.write("===CORE DUMP===\n")
+                f.write(f"Stack Pointer: {sp}\n===============================\n")
+                f.write(f"memory: {memory}\n===============================\n")
+                f.write(f"namespace: {namespace}\n")
+            f.close()
     return sp, return_values
 
 def resolve_cast_function(tokens: list, i: int, t: object, helper: object):
