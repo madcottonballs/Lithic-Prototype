@@ -319,7 +319,10 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
             with open("coredump.txt", "w") as f:
                 f.write("===CORE DUMP===\n")
                 f.write(f"Stack Pointer: {sp}\n===============================\n")
-                f.write(f"memory: {memory}\n===============================\n")
+                f.write("memory:\n")
+                for i, v in enumerate(memory):
+                    f.write(f"  [{i}]: {v}\n")
+                f.write(f"===============================\n")
                 f.write(f"namespace: {namespace}\n")
             f.close()
     return sp, return_values

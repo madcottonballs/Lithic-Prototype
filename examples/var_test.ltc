@@ -9,5 +9,6 @@ define main() {
     printf(c);
     let ptr p = malloc(4);
     printf(p);
+    coredump();
     return(0);
 }
