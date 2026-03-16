@@ -1,0 +1,13 @@
+define main() { 
+    let i32 x = 6;
+    printf(x);
+    let string str = "Hello, world!";
+    printf(str);
+    let boolean b = true;
+    printf(b);
+    let char c = 'A';
+    printf(c);
+    let ptr p = malloc(4);
+    printf(p);
+    return(0);
+}

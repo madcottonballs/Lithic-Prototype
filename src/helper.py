@@ -310,11 +310,11 @@ def dereference_var(t, namespace, memory, var_ref_token):
 
     match var_type:
         case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
-            class_ref = t.__dict__[var_type]                        # gathers the class reference for the variable type (e.g. t.i32) from the main.py typerizer dict, so that we can call its read_from_memory method to get the value from memory and return it as an object of the correct type.
-            temp_instance = class_ref(0)                        # create a temporary instance of the variable type (e.g. t.i32(0)) just to call the read_from_memory method and return the correctly typed value from memory, since we can't call read_from_memory directly on the class reference.
-            temp_instance.read_from_memory(memory, addr)     # call the read_from_memory method of the correct type class to read the value from memory and return it as an object of the correct type (e.g. t.i32)
-            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
-            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            class_ref = t.__dict__[var_type]                        # gathers the class reference for the variable type (e.g. t.i32)
+            temp_instance = class_ref(0)                        # create a temporary instance to call read_from_memory
+            temp_instance = temp_instance.read_from_memory(memory, addr)  # read_from_memory returns a typed value
+            temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
         case "string":
             end = addr
@@ -335,10 +335,10 @@ def dereference_var(t, namespace, memory, var_ref_token):
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "ptr":
-            temp_instance = t.ptr(0)                          # create a temporary instance of the ptr type just to call the read_from_memory method and return the correctly typed value from memory, since we can't call read_from_memory directly on the class reference.
-            temp_instance.read_from_memory(memory, addr)
-            temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
-            temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
+            temp_instance = t.ptr(0)                          # create a temporary instance to call read_from_memory
+            temp_instance = temp_instance.read_from_memory(memory, addr)
+            temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
+            temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
         case "array":
             elem_type = var_meta["elem_type"]
