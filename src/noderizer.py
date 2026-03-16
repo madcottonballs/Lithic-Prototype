@@ -317,12 +317,12 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names
         # If previous token is value-like, sign should be treated as binary.
         if previous_symbol in (")", "]"):
             return False
-        if isinstance(previous_token, (t.integer, t.boolean, t.string, t.char, t.array, t.var_ref)):
+        if isinstance(previous_token, (t.integer, t.boolean, t.string, t.char, t.array, t.var_ref, t.ptr, subexp, oper, mono_oper)):
             return False
 
-        # Delimiters/operators indicate a new expression segment.
+        # Non-string previous symbols are value-like (e.g. numeric literals), so treat '+'/'-' as binary.
         if not isinstance(previous_symbol, str):
-            return True
+            return False
 
         return previous_symbol in {"(", "[", "{", ",", "=", "+", "-", "*", "/", "%", "!", "<", ">", "->"}
 

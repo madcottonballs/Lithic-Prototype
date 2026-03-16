@@ -15,8 +15,13 @@ def build_subexp(start_idx, tokens, helper, t, function_names, namespace, memory
                 # This is a function call with parentheses already collapsed into a `subexp`.
                 # Convert it into a function node and keep only that node.
                 arguments = tokens[index].val
-                if not any(getattr(tok, "val", None) == "," for tok in arguments):
-                    arguments = [n.subexp(arguments)]
+                if arguments:
+                    if not any(getattr(tok, "val", None) == "," for tok in arguments):
+                        # Single expression argument; don't wrap if it's already a subexp.
+                        if len(arguments) == 1 and isinstance(arguments[0], n.subexp):
+                            arguments = [arguments[0]]
+                        else:
+                            arguments = [n.subexp(arguments)]
                 tokens[index - 1] = t.function(tokens[index - 1].val, arguments)
                 del tokens[index]
                 index -= 1
@@ -24,8 +29,13 @@ def build_subexp(start_idx, tokens, helper, t, function_names, namespace, memory
                 # This is a user_function call with parentheses already collapsed into a `subexp`.
                 # Convert it into a user_function node and keep only that node.
                 arguments = tokens[index].val
-                if not any(getattr(tok, "val", None) == "," for tok in arguments):
-                    arguments = [n.subexp(arguments)]
+                if arguments:
+                    if not any(getattr(tok, "val", None) == "," for tok in arguments):
+                        # Single expression argument; don't wrap if it's already a subexp.
+                        if len(arguments) == 1 and isinstance(arguments[0], n.subexp):
+                            arguments = [arguments[0]]
+                        else:
+                            arguments = [n.subexp(arguments)]
                 tokens[index - 1] = t.user_function(tokens[index - 1].val, arguments)
                 del tokens[index]
                 index -= 1

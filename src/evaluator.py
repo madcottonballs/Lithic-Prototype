@@ -45,7 +45,7 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
         if isinstance(tokens[i], n.subexp):
             sp, return_values = evaluate(tokens[i].val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
             if len(tokens[i].val) != 1:
-                raise TypeError("Sub-expression did not reduce to a single value")
+                raise TypeError(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
 
         if isinstance(tokens[i], t.function):
