@@ -1,7 +1,0 @@
-import "dictlib.ltc"
-
-define main() {
-    let i32 x = 5;
-    dictlib.hello(5);
-    return(0);
-}

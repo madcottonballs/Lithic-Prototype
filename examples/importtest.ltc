@@ -1,0 +1,11 @@
+import "dictlib.ltc";
+
+define main() {
+    /*let ptr test = dictlib.makeDict();*/
+    let ptr x = malloc(5);
+    @(x) = 10;
+    iterate(i, 5) {
+        printf(@(x + i));
+    }
+    return(0);
+}

@@ -37,14 +37,21 @@ def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, 
             return True, stack_ptr
 
     if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.integer):
-        if type(tokens[i].node1) != type(tokens[i].node2):
+        if type(tokens[i].node1) == t.ptr or type(tokens[i].node2) == t.ptr: # 
+            ptr_arithmatic = True
+        else:
+            ptr_arithmatic = False
+        if (type(tokens[i].node1) != type(tokens[i].node2)) and not ptr_arithmatic:  # if not using ptr arithmetic, then the types must match. If using ptr arithmetic, then one can be a ptr and the other can be an integer.
             # Unary-negation rewrite may produce 0 - <typed-int>; align the synthetic zero type.
             if isinstance(tokens[i], n.sub) and tokens[i].node1.val == 0 and type(tokens[i].node1) is t.i32:
                 tokens[i].node1 = type(tokens[i].node2)(0)
             else:
                 raise TypeError(f"Type mismatch in operation: {type(tokens[i].node1).__name__} vs {type(tokens[i].node2).__name__}")
         
-        resolve_type = type(tokens[i].node1) # resolve_type is the type of the result of the operation, which should be the same as the type of the operands since we do not allow mixed-type operations. We can just use the type of one of the operands for this.
+        if ptr_arithmatic:
+            resolve_type = t.ptr
+        else:
+            resolve_type = type(tokens[i].node1) # resolve_type is the type of the result of the operation, which should be the same as the type of the operands since we do not allow mixed-type operations. We can just use the type of one of the operands for this.
 
         if isinstance(tokens[i], n.add):
             tokens[i] = resolve_type(tokens[i].node1.val + tokens[i].node2.val)

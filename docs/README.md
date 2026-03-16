@@ -3,11 +3,18 @@
 * Stack mechanism broke the free operator
 * Function parameters aren't working with arrays
 * Cannot do indexed string assignment
+* cannot dereference ptrs
+* Must add heap
+* Must change malloc() to use heap
+* var dereferencing isnt working
 
 # Details
 * This is a prototype of a minimalist imperative programming language.
 * This language is called Lithic.
 * Lithic uses the file extension ".ltc".
+* All programs enters at the main() function.
+* All functions return a value.
+* Lithic has a statically typed, explictly declared, fixed-width primitive type system with block-scoped shadowing. 
 
 # Syntax Highlighting
 * There is support for syntax highlighting in VS code.
@@ -18,6 +25,7 @@
 
 # operators
 ##	arithmatic
+* 		Pointer arithmatic is fully supported.
 
 ###		[integer] + [integer]
 			Add operator adds the values of the numbers together.
@@ -29,28 +37,28 @@
 			Divide operator divides the value of the left by the right.
 
 ###		[integer var_ref] += [integer]
-			Addition assignment operator adds the right number to the value of the variable of type i32.
+			Addition assignment operator adds the right number to the value of the variable of an integer type.
 ###		[integer var_ref] -= [integer]
-			Subtraction assignment operator subtracts the right number from the value of the variable of type i32.
+			Subtraction assignment operator subtracts the right number from the value of the variable of an integer type.
 ###		*[integer var_ref] *= [integer]
-			Multiplication assignment operator multiplies the right number with the value of the variable of type i32.
+			Multiplication assignment operator multiplies the right number with the value of the variable of an integer type.
 ###		*[integer var_ref] /= [integer]
-			Division assignment operator divides the right number from the value of the variable of type i32.
+			Division assignment operator divides the right number from the value of the variable of an integer type.
 		
 ###		[integer var_ref]++
-			Increment operator adds 1 to the variable of type i32.
+			Increment operator adds 1 to the variable of an integer type.
 			Ex: 
 >				x++
 ###		[integer var_ref]--
-			Decrement operator subtracts 1 from the variable of type i32.
+			Decrement operator subtracts 1 from the variable of an integer type.
 			Ex: 
 >				x--
 ###		*[integer var_ref]**
-			Double operator multiplies the variable of type i32 by 2.
+			Double operator multiplies the variable of an integer type by 2.
 			Ex:
 >				x**
 ###		*[integer var_ref]//
-			Halve operator divides the variable of type i32 by 2.
+			Halve operator divides the variable of an integer type by 2.
 			Ex: 
 >				x//
 ###		*[array[integer] var_ref] $ [operator] [integer]
@@ -132,6 +140,16 @@
 ##	Misc:
 ###		*exit([i32])
 			Immediantly ends the program and returns the number as the exit code.
+###		import [str]
+			Inlines the code in the .ltc file referenced by the string.
+			All functions in the imported file will have their named prefixed by the filename. 
+			Ex:
+```				import "test.ltc";
+				define main() {
+					test.doSmth();
+					return(0);
+				}
+```		
 ##	Data:
 ###		sLength([string])
 			Returns (as a i32) the number of characters in the string.
@@ -324,6 +342,40 @@
 		Jumps to the labeled line of code. There is no return.
 ## 	*pass()
 		Does nothing.
+##	define [func_name]([type] [arg_name]) { ... }
+		Creates a custom user function.
+		All functions must return a single object.
+		To return multiple objects, wrap them in a array and return the array.
+		To return multiple objects of different types, wrap them in a ptr array with the elements being ptr's to your objects.
+		The program enters at define main() {}.
+		Ex:
+```
+			define print_hello_world(string appendage) {
+				let string new = sConcat("hello ", appendage);
+				printf(new);
+				return(0);
+			}
+
+			define main() {
+				print_hello_world("world");  /* output: "hello world" */
+				return(0);
+			}
+```
+		Arguments passed into the function can be modified.
+		Changes to variables passed into the function will not affect the variable outside the function. 
+		Ex:
+```
+			define example(i32 var_test) {
+				var_test++; 	/* var_test is now 6 */
+				return(0);
+			}
+			define main() {
+				let i32 x = 5;
+				example(x);
+				printf(x); 		/* output: 5 */
+				return(0);
+			}
+```
 # Types
 *	All integer types are "true" when cast to boolean if they're not 0.
 *	When casted to char, returns the ascii

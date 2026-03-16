@@ -1,7 +1,7 @@
 define main() { 
     let ptr y = malloc(10);
     let i32 x = 5;
-    printf(y);
+    printf(typeof(y + 5));
     coredump();
     return(0);
 }

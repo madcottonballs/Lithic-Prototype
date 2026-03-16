@@ -3,3 +3,8 @@ The dictlib uses a memory structure like this:
 [u8 size][ptr key][ptr value][ptr key][ptr value]...
 */
 
+define makeDict() {
+    let ptr dict = malloc(1);
+    @(dict) = 0;
+    return(dict);
+}
