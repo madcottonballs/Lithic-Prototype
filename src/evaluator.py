@@ -423,6 +423,11 @@ def resolve_cast_function(tokens: list, i: int, t: object, helper: object):
                         tokens[i] = t.char(chr(source_object.val))
                     else:
                         raise ValueError(f"Integer value '{source_object.val}' is not a valid ASCII code point")
+                case t.string: # string -> char
+                    if len(source_object.val) == 1:
+                        tokens[i] = t.char(source_object.val)
+                    else:
+                        raise ValueError(f"String value '{source_object.val}' is not a valid character")
                 case _:
                     raise TypeError(f"Cannot cast object of type '{type(tokens[i].args[0]).__name__}' to type '{cast_target}'")
         case "ptr":

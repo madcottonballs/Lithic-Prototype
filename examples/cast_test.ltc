@@ -11,9 +11,9 @@ define main() {
         printf("Integer -> Boolean cast failed.");
     }
     if (x -> string -> char == '6') {
-        printf("Integer -> String cast successful.");
+        printf("Integer -> char cast successful.");
     } else {
-        printf("Integer -> String cast failed.");
+        printf("Integer -> char cast failed.");
     }
 
     return(0);

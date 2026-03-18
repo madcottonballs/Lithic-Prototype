@@ -249,6 +249,8 @@
 				from integers:
 					The integer value is used as an index for ascii.
 					Example: 104 -> char == 'h'
+				from string:
+					The string must be only one character.
 			casting to ptr:
 				from integers:
 					The integer must be able to fit in a u64.
