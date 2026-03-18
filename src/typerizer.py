@@ -18,9 +18,19 @@ class char(ltc_type):
     def __init__(self, val):
         super().__init__(val)
         self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
+    def load_to_memory(self, memory, addr):
+        memory[addr] = self.val.to_bytes(self.size, byteorder='little', signed=False)
+    def read_from_memory(self, memory, addr):
+        return chr(int.from_bytes(memory[addr], byteorder='little', signed=False))
+    
 class boolean(ltc_type):
     def __init__(self, val):
         super().__init__(val)
+        self.size = 1
+    def load_to_memory(self, memory, addr):
+        memory[addr] = self.val.to_bytes(self.size, byteorder='little', signed=False)
+    def read_from_memory(self, memory, addr):
+        return bool(int.from_bytes(memory[addr], byteorder='little', signed=False))
 
 class array(ltc_type):
     def __init__(self, val, arrayType=None, parse=True):

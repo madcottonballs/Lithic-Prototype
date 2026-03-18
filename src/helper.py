@@ -1,4 +1,7 @@
 """Helper functions for the interpreter, used across multiple modules. Source import is in main.py."""
+from typerizer import u64
+
+
 def create_frame(stack_frame: list[int], sp: int, namespace: list[dict[str, any]]):
     stack_frame.append(sp)
     namespace.append({})
@@ -561,3 +564,22 @@ def malloc(size: int, heap_ptr: int, sp: int) -> tuple[int, int]:
     hp -= size
     allocated_address = hp
     return hp, allocated_address
+
+def read_ltc_type_from_mem(memory, addr, type_str, t):
+    ltc_type = t.__dict__[type_str]
+    match type_str:
+        case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
+            return ltc_type(int.from_bytes(memory[addr:addr + integer_type_to_size(type_str)], byteorder='little', signed=integer_type_to_signedness(type_str)))
+        case "string":
+            end = addr
+            while end < len(memory) and memory[end] != 0:
+                end += 1
+            return t.string(memory[addr:end].decode("utf-8"))
+        case "boolean":
+            return t.boolean(memory[addr] != 0)
+        case "char":
+            return t.char(chr(memory[addr]))
+        case "ptr":
+            return t.ptr(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
+        case _:
+            raise TypeError(f"Unsupported type for reading from mem: {type_str}")

@@ -51,13 +51,18 @@ class subexp():
     def __init__(self, val: list):
         self.val = val
 
+class at_func_return:
+    """Exists so @(ptr, type) function can return a obj to be fed specifically to assign_oper. self.val holds a ltc_type read from memory."""
+    def __init__(self, val, addr, type_size):
+        self.val = val
+        self.addr = addr
+        self.type_size = type_size
+
 # mother function
 def generate_trees(t, function_names, helper, tokens, namespace, memory, user_functions, types, start_index=0):
     # Non-list inputs are already single nodes and do not need list-based passes.
     if not isinstance(tokens, list):
         return
-
-    #_build_function_calls(tokens, t, helper, start_index)
 
     # Pass 0: collapse array type declarations like `i32[4]` into one array token.
     _build_array_type_tokens(tokens, t, start_index)

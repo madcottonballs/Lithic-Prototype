@@ -5,6 +5,7 @@
 * Cannot do indexed string assignment
 * cannot dereference ptrs
 * var scoping is broken
+* malloc() isnt moving the hp in all instances due to incomplete processing of return values of evalulate() ex: (sp, _, _)
 
 # Details
 * This is a prototype of a minimalist imperative programming language.
@@ -23,7 +24,7 @@
 
 # operators
 ##	arithmatic
-* 		Pointer arithmatic is fully supported.
+* 		Pointer arithmatic is fully supported. Because pointers don't tell what they're pointing to, pointer arithmatic is byte-based, not type-based like in C.
 
 ###		[integer] + [integer]
 			Add operator adds the values of the numbers together.

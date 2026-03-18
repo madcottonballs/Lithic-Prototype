@@ -51,6 +51,9 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                 raise TypeError(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
 
+        if isinstance(tokens[i], n.at_func_return):
+            tokens[i] = tokens[i].val
+
         if isinstance(tokens[i], t.function):
             for arg_idx, arg_val in enumerate(tokens[i].args):
                 # aSet needs the array variable reference as its first argument.
@@ -62,7 +65,7 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                 # Do not force all function args to be runtime values here.
                 # `let` intentionally carries identifier/operator tokens through to function_processing.
                 tokens[i].args[arg_idx] = reduced
-            sp, return_values, hp = function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, sp, hp)
+            sp, return_values, hp = function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, sp, hp, n)
             if isinstance(tokens[i], t.function) and tokens[i].val == "return":
                 return sp, return_values, hp
 
@@ -92,7 +95,7 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
 
     return sp, return_values, hp
 
-def function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, stack_ptr, heap_ptr) -> tuple[int, list]:
+def function_processing(tokens, i, memory, namespace, types: dict, t, helper, stack_frames, return_values, stack_ptr, heap_ptr, n) -> tuple[int, list]:
     """Process built-ins and return updated stack pointer."""
     sp = stack_ptr
     hp = heap_ptr
@@ -344,7 +347,33 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
             if not isinstance(arg, t.integer):
                 raise TypeError(f"exit code argument must be an integer, got {type(arg).__name__}")
             exit(arg.val)
+        
+        case "@":
+            if len(tokens[i].args) != 2:
+                raise SyntaxError("@ expects exactly two arguments: @(ptr, type)")
+            
+            ptr_arg = tokens[i].args[0]
+            type_arg = tokens[i].args[1]
 
+            if not isinstance(ptr_arg, t.ptr):
+                raise TypeError(f"First argument to @ must be a pointer, got {type(ptr_arg).__name__}")
+            if (not isinstance(type_arg, t.token)) or (not type_arg.val in types.keys()):
+                raise TypeError(f"Second argument to @ must be a type name, instead got {type_arg.val}")
+            
+            match type_arg.val:
+                # note: all types that are supported by @ must have .read_from_memory implemented in their ltc type class, which is used here to read the byte value from memory
+                case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
+                    type_size = helper.integer_type_to_size(type_arg.val)
+                case "boolean":
+                    type_size = 1
+                case "char":
+                    type_size = 1
+                case _:
+                    raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
+                    
+            ptr_deref = helper.read_ltc_type_from_mem(memory, ptr_arg.val, type_arg.val, t) # returns the obj read from memory
+
+            tokens[i] = n.at_func_return(ptr_deref, ptr_arg.val, type_size) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
     return sp, return_values, hp
 
 def resolve_cast_function(tokens: list, i: int, t: object, helper: object):

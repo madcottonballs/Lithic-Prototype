@@ -18,5 +18,6 @@ define int_casts(i32 x) {
 }
 define main() {
     int_casts(6);
+    printf(typeof(i32));
     return(0);
 }

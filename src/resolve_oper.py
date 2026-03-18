@@ -98,6 +98,25 @@ def resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack
     """Resolve assignment and return (possibly unchanged) stack pointer."""
     sp = stack_ptr
 
+    if isinstance(tokens[i].node1, t.function) and tokens[i].node1.val == "@":
+        temp = [tokens[i].node1]
+        sp, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+        tokens[i].node1 = temp[0]
+
+    if isinstance(tokens[i].node1, n.at_func_return):
+        target = tokens[i].node1
+        rhs = tokens[i].node2
+        if isinstance(rhs, n.oper | n.subexp | t.function | t.user_function):
+            temp = [rhs]
+            sp, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+            rhs = temp[0]
+        elif isinstance(rhs, t.var_ref):
+            rhs = helper.dereference_var(t, namespace, memory, rhs)
+
+        helper.load_to_mem(memory, rhs, sp, type(rhs).__name__, memidx=target.addr)
+        tokens[i] = t.i32(0)
+        return sp
+
     if not isinstance(tokens[i].node1, t.var_ref):
         raise TypeError("Left side of assignment must be a variable reference")
 
