@@ -2,47 +2,42 @@
 This includes both evaluating the operands and performing the operation itself. 
 The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. 
 If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
+# create a resolve_node function eventually that is used universally for every node of every oper *debug
 def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
     t = ltc.t
     n = ltc.n
-    helper = ltc.helper
-    namespace = ltc.namespace
-    memory = ltc.memory
-    types = ltc.types
     stack_ptr = ltc.sp
-    user_functions = ltc.user_functions
-    stack_frames = ltc.stack_frames
     if isinstance(tokens[i], n.mono_oper):
         if isinstance(tokens[i], n.invert):
-            resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_invert_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         elif isinstance(tokens[i], n.free):
-            resolve_free_oper(tokens, i, t, helper, namespace, memory)
+            resolve_free_oper(tokens, i, ltc)
             return True, stack_ptr
         elif isinstance(tokens[i], n.memloc):
-            resolve_memloc_oper(tokens, i, t, helper, namespace, memory)
+            resolve_memloc_oper(tokens, i, ltc)
             return True, stack_ptr
     elif isinstance(tokens[i], n.oper):
         if isinstance(tokens[i], n.assign):
             stack_ptr = resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.equal):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "==", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, "==", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.not_equal):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "!=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, "!=", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.gtr_than):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, ">", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.less_than):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, "<", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.gtr_than_or_equal):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, ">=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, ">=", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.less_than_or_equal):
-            resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "<=", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
+            resolve_bool_oper(ltc, tokens, i, "<=", return_values, evaluate, execute_source_fn)
             return True, stack_ptr
 
     if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.integer):
@@ -109,10 +104,7 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
     helper = ltc.helper
     namespace = ltc.namespace
     memory = ltc.memory
-    types = ltc.types
     stack_ptr = ltc.sp
-    user_functions = ltc.user_functions
-    stack_frames = ltc.stack_frames
     """Resolve assignment and return (possibly unchanged) stack pointer."""
     sp = stack_ptr
 
@@ -131,7 +123,7 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
         elif isinstance(rhs, t.var_ref):
             rhs = helper.dereference_var(t, namespace, memory, rhs)
 
-        helper.load_to_mem(memory, rhs, sp, type(rhs).__name__, memidx=target.addr)
+        helper.load_to_mem(ltc, rhs, type(rhs).__name__, memidx=target.addr)
         tokens[i] = t.i32(0)
         return sp
 
@@ -175,22 +167,25 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
     tokens[i] = t.i32(0)
     return sp
 
-def resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, oper: str, user_functions, stack_frames, return_values, evaluate, stack_ptr=0, execute_source_fn=None):
+def resolve_bool_oper(ltc, tokens, i, oper: str, return_values, evaluate, execute_source_fn=None):
+    n = ltc.n
+    t = ltc.t
+    helper = ltc.helper
     lhs = tokens[i].node1
     if isinstance(lhs, n.oper | n.subexp | t.function):
         temp = [lhs]
-        evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, evaluate, execute_source_fn)
+        evaluate(temp, ltc, return_values, execute_source_fn)
         lhs = temp[0]
     elif isinstance(lhs, t.var_ref):
-        lhs = helper.dereference_var(t, namespace, memory, lhs)
+        lhs = helper.dereference_var(ltc, lhs)
 
     rhs = tokens[i].node2
     if isinstance(rhs, n.oper | n.subexp | t.function):
         temp = [rhs]
-        evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames,  return_values,stack_ptr, execute_source_fn)
+        evaluate(temp, ltc, return_values, execute_source_fn)
         rhs = temp[0]
     elif isinstance(rhs, t.var_ref):
-        rhs = helper.dereference_var(t, namespace, memory, rhs)
+        rhs = helper.dereference_var(ltc, rhs)
 
     if type(lhs).__name__ != type(rhs).__name__:
         raise TypeError(f"Type mismatch in equality operator '{lhs.val} {oper} {rhs.val}'")
@@ -211,35 +206,42 @@ def resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, oper: s
 
     tokens[i] = t.boolean(bool_result)
 
-def resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_functions, stack_frames, return_values, evaluate, stack_ptr=0, execute_source_fn=None):
+def resolve_invert_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
+    t = ltc.t
+    n = ltc.n
+    helper = ltc.helper    
     rhs = tokens[i].node
     if isinstance(rhs, n.oper | n.subexp | t.function):
         temp = [rhs]
         evaluate(temp, ltc, return_values, execute_source_fn)
         rhs = temp[0]
     elif isinstance(rhs, t.var_ref):
-        rhs = helper.dereference_var(t, namespace, memory, rhs)
+        rhs = helper.dereference_var(ltc, rhs)
 
     if not isinstance(rhs, t.boolean):
         raise TypeError("Invert operator only inverts a boolean. To use truthiness, try using truthy operator ('!!').")
 
     tokens[i] = t.boolean(not rhs.val)
 
-def resolve_free_oper(tokens, i, t, helper, namespace, memory):
+def resolve_free_oper(tokens, i, ltc):
+    t = ltc.t
+    helper = ltc.helper
     if not isinstance(tokens[i].node, t.var_ref):
         raise TypeError(f"free operator must be a var_ref, not {type(tokens[i].node).__name__}")
 
     var_name = tokens[i].node.val
-    tokens[i] = helper.dereference_var(t, namespace, memory, tokens[i].node)
-    var_data = helper.locate_var_in_namespace(namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
-    del namespace[var_data[1]][var_name]
+    tokens[i] = helper.dereference_var(ltc, tokens[i].node)
+    var_data = helper.locate_var_in_namespace(ltc.namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
+    del ltc.namespace[var_data[1]][var_name]
 
-def resolve_memloc_oper(tokens, i, t, helper, namespace, memory):
+def resolve_memloc_oper(tokens, i, ltc):
+    t = ltc.t
+    helper = ltc.helper
     obj = tokens[i].node
     if not isinstance(obj, t.ltc_type | t.var_ref):
         raise TypeError(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
     if isinstance(obj, t.var_ref):
-        obj = helper.dereference_var(t, namespace, memory, obj)
+        obj = helper.dereference_var(ltc, obj)
     if not obj.inmemory:
         raise TypeError(f"Object '{obj.val}' of type '{type(obj).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")
 

@@ -16,7 +16,7 @@ def _reduce_argument_value(argument, ltc, return_values, execute_source_fn=None)
     elif isinstance(value, t.var_ref):
         value = helper.dereference_var(ltc, value)
 
-    return value, sp, return_values, hp
+    return value, ltc.sp, return_values, ltc.hp
 
 def _bind_user_function_args(call_node, arg_types, arg_names, ltc):
     """Load user-function arguments into the current frame namespace."""
@@ -24,14 +24,14 @@ def _bind_user_function_args(call_node, arg_types, arg_names, ltc):
     for idx, (expected_type, arg_name) in enumerate(zip(arg_types, arg_names)):
         argument_value = call_node.arguments[idx]
 
-        var_addr = sp
-        sp = ltc.helper.load_to_mem(ltc.memory, argument_value, sp, expected_type)
+        var_addr = ltc.sp
+        ltc.sp = ltc.helper.load_to_mem(ltc, argument_value, expected_type)
         ltc.namespace[len(ltc.namespace) - 1][arg_name] = {
             "type": expected_type,
             "addr": var_addr,
         }
 
-    return sp
+    return ltc.sp
 
 def evaluate(tokens, ltc, return_values, execute_source_fn):
     """Walk the tree/list and reduce operations. Returns updated stack pointer.
@@ -45,7 +45,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn):
     i = 0
     while i < len(tokens):
         if isinstance(tokens[i], n.oper | n.mono_oper):
-            retry_current, sp = resolve_opers(tokens, return_values, evaluate, execute_source_fn)
+            retry_current, sp = resolve_opers(tokens, 0, ltc, return_values, evaluate, execute_source_fn)
             if retry_current:
                 continue
 
@@ -101,8 +101,8 @@ def evaluate(tokens, ltc, return_values, execute_source_fn):
 
 def function_processing(tokens, i, ltc, return_values) -> tuple[int, list]:
     """Process built-ins and return updated stack pointer."""
-    sp = ltc.stack_ptr
-    hp = ltc.heap_ptr
+    sp = ltc.sp
+    hp = ltc.hp
     t = ltc.t
     helper = ltc.helper
     n = ltc.n
@@ -155,16 +155,16 @@ def function_processing(tokens, i, ltc, return_values) -> tuple[int, list]:
                             f"Let statement tried to declare {var_type_arg.arrayType}[{var_type_arg.size}] "
                             f"but was assigned {var_value_arg.arrayType}[{len(var_value_arg.val)}]"
                         )
-                    sp = helper.load_to_mem(ltc.memory, var_value_arg, sp, "array")
+                    sp = helper.load_to_mem(ltc, var_value_arg, "array")
                 else:
-                    sp = helper.load_to_mem(ltc.memory, var_value_arg, sp, var_type_arg.val)
+                    sp = helper.load_to_mem(ltc, var_value_arg, var_type_arg.val)
             else:
                 if isinstance(var_type_arg, t.array):
                     empty_array = t.array([], arrayType=var_type_arg.arrayType, parse=False)
                     empty_array.size = var_type_arg.size
-                    sp = helper.load_to_mem(ltc.memory, empty_array, sp, "array")
+                    sp = helper.load_to_mem(ltc, empty_array, "array")
                 else:
-                    sp = helper.load_to_mem(ltc.memory, helper.recieve_empty_form(t, var_type_arg.val), sp, var_type_arg.val)
+                    sp = helper.load_to_mem(ltc, helper.recieve_empty_form(t, var_type_arg.val), var_type_arg.val)
             
             if isinstance(var_type_arg, t.array):
                 ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
@@ -297,13 +297,13 @@ def function_processing(tokens, i, ltc, return_values) -> tuple[int, list]:
             match elem_type:
                 case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
                     elem_addr = base_addr + (array_index.val * helper.integer_type_to_size(elem_type))
-                    helper.load_to_mem(ltc.memory, new_value, sp, elem_type, memidx=elem_addr)
+                    helper.load_to_mem(ltc, new_value, elem_type, memidx=elem_addr)
                 case "boolean":
                     elem_addr = base_addr + array_index.val
-                    helper.load_to_mem(ltc.memory, new_value, sp, "boolean", memidx=elem_addr)
+                    helper.load_to_mem(ltc, new_value, "boolean", memidx=elem_addr)
                 case "char":
                     elem_addr = base_addr + array_index.val
-                    helper.load_to_mem(ltc.memory, new_value, sp, "char", memidx=elem_addr)
+                    helper.load_to_mem(ltc, new_value, "char", memidx=elem_addr)
                 case _:
                     raise TypeError(f"aSet does not support element type '{elem_type}' yet")
 

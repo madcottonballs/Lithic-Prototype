@@ -15,6 +15,7 @@ class State:
         self.t = t
         self.helper = helper
         self.n = noderizer
+        self.noderizer = noderizer # alias
         self.tokenizer = tokenizer
         self.evaluator = evaluator
         self.sp = 0
@@ -261,7 +262,7 @@ def main(raw_source: str, memory_size: int=1024) -> int:
     ltc.hp = memory_size - 1
     ltc.user_functions = {} # maps function names to {"arg_types": [...], "arg_names": [...], "body": "..."}
     return_values = []
-    ltc.sp, return_values, ltc.hp = execute_source(raw_source, ltc, return_values)
+    ltc.sp, return_values, ltc.hp = execute_source(ltc.raw_source, ltc, return_values)
     if return_values == None:
         raise RuntimeError("Program did not return a value")
     return return_values[0] if len(return_values) == 1 else return_values
