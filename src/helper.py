@@ -2,12 +2,12 @@
 from typerizer import u64
 
 
-def create_frame(stack_frame: list[int], sp: int, namespace: list[dict[str, any]]):
-    stack_frame.append(sp)
-    namespace.append({})
-def destroy_frame(stack_frame: list[int], namespace: list[dict[str, any]]) -> int:
-    sp = stack_frame.pop()
-    namespace.pop()
+def create_frame(ltc):
+    ltc.stack_frames.append(ltc.sp)
+    ltc.namespace.append({})
+def destroy_frame(ltc) -> int:
+    sp = ltc.stack_frames.pop()
+    ltc.namespace.pop()
     return sp
 
 
@@ -305,41 +305,41 @@ def read_statement(source_text: str, start_index: int) -> tuple[str, int]:
     statement_text = source_text[start_index:cursor].strip()
     return statement_text, cursor
 
-def dereference_var(t, namespace, memory, var_ref_token):
+def dereference_var(ltc, var_ref_token):
     """Enter a var_ref token, recieve its obj from memory"""
-    var_meta = locate_var_in_namespace(namespace, var_ref_token.val, return_just_the_check=False)[0]
+    var_meta = locate_var_in_namespace(ltc.namespace, var_ref_token.val, return_just_the_check=False)[0]
     var_type: str = var_meta["type"]
     addr: int = var_meta["addr"]
-
+    t = ltc.t
     match var_type:
         case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
             class_ref = t.__dict__[var_type]                        # gathers the class reference for the variable type (e.g. t.i32)
             temp_instance = class_ref(0)                        # create a temporary instance to call read_from_memory
-            temp_instance = temp_instance.read_from_memory(memory, addr)  # read_from_memory returns a typed value
+            temp_instance = temp_instance.read_from_memory(ltc.memory, addr)  # read_from_memory returns a typed value
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
         case "string":
             end = addr
-            while end < len(memory) and memory[end] != 0:
+            while end < len(ltc.memory) and ltc.memory[end] != 0:
                 end += 1
-            temp_instance = t.string(memory[addr:end].decode("utf-8"))
+            temp_instance = t.string(ltc.memory[addr:end].decode("utf-8"))
             temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "char":
-            temp_instance = t.char(chr(memory[addr]))
+            temp_instance = t.char(chr(ltc.memory[addr]))
             temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "boolean":
-            temp_instance = t.boolean(memory[addr] != 0)
+            temp_instance = t.boolean(ltc.memory[addr] != 0)
             temp_instance.inmemory = True                     # mark the temp instance as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "ptr":
             temp_instance = t.ptr(0)                          # create a temporary instance to call read_from_memory
-            temp_instance = temp_instance.read_from_memory(memory, addr)
+            temp_instance = temp_instance.read_from_memory(ltc.memory, addr)
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
@@ -351,12 +351,12 @@ def dereference_var(t, namespace, memory, var_ref_token):
                 case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
                     for index in range(length):
                         element_addr = addr + (index * integer_type_to_size(elem_type))
-                        element_value = int.from_bytes(memory[element_addr:element_addr + integer_type_to_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
+                        element_value = int.from_bytes(ltc.memory[element_addr:element_addr + integer_type_to_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
                         values.append(t.__dict__[elem_type](element_value))
                 case "boolean":
                     for index in range(length):
                         element_addr = addr + index
-                        values.append(t.boolean(memory[element_addr] != 0))
+                        values.append(t.boolean(ltc.memory[element_addr] != 0))
                 case _:
                     raise TypeError(f"Unsupported array element type: {elem_type}")
 
@@ -392,13 +392,13 @@ def integer_type_to_signedness(type_name: str) -> bool:
         case _:
             raise ValueError(f"Unknown integer type: {type_name}")
 
-def load_to_mem(memory, object, stack_ptr, input_type="no type entered", memidx: int | None = None) -> int:
+def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = None) -> int:
     """Load an object into memory.
 
     - Allocation mode (memidx is None): write at stack_ptr and advance sp.
     - Overwrite mode (memidx is set): write at memidx and keep sp unchanged.
     """
-    sp = stack_ptr
+    sp = ltc.sp
     write_ptr = sp if memidx is None else memidx
 
     if input_type == "no type entered":
@@ -409,18 +409,18 @@ def load_to_mem(memory, object, stack_ptr, input_type="no type entered", memidx:
     match resolved_type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
             byte_rep_of_val = object.val.to_bytes(integer_type_to_size(resolved_type), byteorder='little', signed=integer_type_to_signedness(resolved_type))
-            memory[write_ptr:write_ptr + integer_type_to_size(resolved_type)] = byte_rep_of_val
+            ltc.memory[write_ptr:write_ptr + integer_type_to_size(resolved_type)] = byte_rep_of_val
             if memidx is None:
                 sp += integer_type_to_size(resolved_type)
         case "string":
             if memidx is None:
-                sp = add_string_to_memory(object, memory, sp)
+                sp = add_string_to_memory(object, ltc.memory, sp)
             else:
                 byte_rep_of_str = object.val.encode('utf-8') + b'\x00'
-                memory[write_ptr:write_ptr + len(byte_rep_of_str)] = byte_rep_of_str
+                ltc.memory[write_ptr:write_ptr + len(byte_rep_of_str)] = byte_rep_of_str
         case "boolean":
             byte_rep_of_val = 1 if object.val else 0
-            memory[write_ptr] = byte_rep_of_val
+            ltc.memory[write_ptr] = byte_rep_of_val
             if memidx is None:
                 sp += 1
         case "array":
@@ -430,7 +430,7 @@ def load_to_mem(memory, object, stack_ptr, input_type="no type entered", memidx:
                     element_width = integer_type_to_size(object.arrayType)
                     for i, element in enumerate(object.val):
                         element_ptr = array_ptr + (i * element_width)
-                        load_to_mem(memory, element, sp, object.arrayType, memidx=element_ptr)
+                        load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
                     if memidx is None:
                         sp += element_width * object.get_size()
                 case "string":
@@ -439,18 +439,18 @@ def load_to_mem(memory, object, stack_ptr, input_type="no type entered", memidx:
                     element_width = 1
                     for i, element in enumerate(object.val):
                         element_ptr = array_ptr + i
-                        load_to_mem(memory, element, sp, object.arrayType, memidx=element_ptr)
+                        load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
                     if memidx is None:
                         sp += element_width * object.get_size()
         case "char":
             byte_rep_of_char = object.val.encode('utf-8')
-            memory[write_ptr] = byte_rep_of_char[0]
+            ltc.memory[write_ptr] = byte_rep_of_char[0]
             if memidx is None:
                 sp += 1
         case "ptr":
             # Handle pointer type loading
             byte_rep_of_val = object.val.to_bytes(8, byteorder='little', signed=False)
-            memory[write_ptr:write_ptr + 8] = byte_rep_of_val
+            ltc.memory[write_ptr:write_ptr + 8] = byte_rep_of_val
             if memidx is None:
                 sp += 8
         case _:

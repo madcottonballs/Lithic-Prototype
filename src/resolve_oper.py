@@ -2,7 +2,16 @@
 This includes both evaluating the operands and performing the operation itself. 
 The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. 
 If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
-def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn=None):
+def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
+    t = ltc.t
+    n = ltc.n
+    helper = ltc.helper
+    namespace = ltc.namespace
+    memory = ltc.memory
+    types = ltc.types
+    stack_ptr = ltc.sp
+    user_functions = ltc.user_functions
+    stack_frames = ltc.stack_frames
     if isinstance(tokens[i], n.mono_oper):
         if isinstance(tokens[i], n.invert):
             resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
@@ -15,7 +24,7 @@ def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, 
             return True, stack_ptr
     elif isinstance(tokens[i], n.oper):
         if isinstance(tokens[i], n.assign):
-            stack_ptr = resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn)
+            stack_ptr = resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True, stack_ptr
         if isinstance(tokens[i], n.equal):
             resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, "==", user_functions, stack_frames, return_values, evaluate, stack_ptr, execute_source_fn)
@@ -63,44 +72,53 @@ def resolve_opers(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, 
             tokens[i] = resolve_type(tokens[i].node1.val / tokens[i].node2.val)
     else:
         if isinstance(tokens[i].node1, n.subexp):
-            stack_ptr, _, _ = evaluate(tokens[i].node1.val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(tokens[i].node1.val, ltc, return_values, execute_source_fn)
             if len(tokens[i].node1.val) != 1:
                 raise TypeError("Sub-expression did not reduce to a single value")
             tokens[i].node1 = tokens[i].node1.val[0]
         elif isinstance(tokens[i].node1, n.oper):
             temp = [tokens[i].node1]
-            stack_ptr, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node1 = temp[0]
         elif isinstance(tokens[i].node1, t.function):
             temp = [tokens[i].node1]
-            stack_ptr, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node1 = temp[0]
 
         if isinstance(tokens[i].node2, n.subexp):
-            stack_ptr, _, _ = evaluate(tokens[i].node2.val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(tokens[i].node2.val, ltc, return_values, execute_source_fn)
             if len(tokens[i].node2.val) != 1:
                 raise TypeError("Sub-expression did not reduce to a single value")
             tokens[i].node2 = tokens[i].node2.val[0]
         elif isinstance(tokens[i].node2, n.oper):
             temp = [tokens[i].node2]
-            stack_ptr, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node2 = temp[0]
         elif isinstance(tokens[i].node2, t.function):
             temp = [tokens[i].node2]
-            stack_ptr, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+            stack_ptr, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node2 = temp[0]
 
         return True, stack_ptr
 
     return False, stack_ptr
 
-def resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack_ptr, user_functions, stack_frames, return_values, evaluate, execute_source_fn=None) -> int:
+def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None) -> int:
+    t = ltc.t
+    n = ltc.n
+    helper = ltc.helper
+    namespace = ltc.namespace
+    memory = ltc.memory
+    types = ltc.types
+    stack_ptr = ltc.sp
+    user_functions = ltc.user_functions
+    stack_frames = ltc.stack_frames
     """Resolve assignment and return (possibly unchanged) stack pointer."""
     sp = stack_ptr
 
     if isinstance(tokens[i].node1, t.function) and tokens[i].node1.val == "@":
         temp = [tokens[i].node1]
-        sp, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+        sp, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
         tokens[i].node1 = temp[0]
 
     if isinstance(tokens[i].node1, n.at_func_return):
@@ -108,7 +126,7 @@ def resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack
         rhs = tokens[i].node2
         if isinstance(rhs, n.oper | n.subexp | t.function | t.user_function):
             temp = [rhs]
-            sp, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+            sp, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
             rhs = temp[0]
         elif isinstance(rhs, t.var_ref):
             rhs = helper.dereference_var(t, namespace, memory, rhs)
@@ -129,7 +147,7 @@ def resolve_assign_oper(tokens, i, t, n, helper, namespace, memory, types, stack
     rhs = tokens[i].node2
     if isinstance(rhs, n.oper | n.subexp | t.function):
         temp = [rhs]
-        sp, _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, execute_source_fn)
+        sp, _, _ = evaluate(temp, ltc, return_values, execute_source_fn)
         rhs = temp[0]
     elif isinstance(rhs, t.var_ref):
         rhs = helper.dereference_var(t, namespace, memory, rhs)
@@ -197,7 +215,7 @@ def resolve_invert_oper(tokens, i, t, n, helper, namespace, memory, types, user_
     rhs = tokens[i].node
     if isinstance(rhs, n.oper | n.subexp | t.function):
         temp = [rhs]
-        evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, execute_source_fn)
+        evaluate(temp, ltc, return_values, execute_source_fn)
         rhs = temp[0]
     elif isinstance(rhs, t.var_ref):
         rhs = helper.dereference_var(t, namespace, memory, rhs)

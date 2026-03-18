@@ -1,52 +1,56 @@
 """This module contains the main evaluation loop for walking the token tree and reducing operations, as well as processing built-in functions."""
 
 from resolve_oper import *
-def _reduce_argument_value(argument, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn=None):
+def _reduce_argument_value(argument, ltc, return_values, execute_source_fn=None):
     """Reduce an argument token to a concrete runtime value token."""
     value = argument
-
+    n = ltc.noderizer
+    t = ltc.t
+    helper = ltc.helper
     if isinstance(value, n.oper | n.mono_oper | n.subexp | n.add | n.sub | n.mult | n.div | t.function | t.user_function):
         temp = [value]
-        sp, return_values, hp = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
+        sp, return_values, hp = evaluate(temp, ltc, return_values, execute_source_fn)
         value = temp[0]
         if isinstance(value, t.var_ref):
-            value = helper.dereference_var(t, namespace, memory, value)
+            value = helper.dereference_var(ltc, value)
     elif isinstance(value, t.var_ref):
-        value = helper.dereference_var(t, namespace, memory, value)
+        value = helper.dereference_var(ltc, value)
 
     return value, sp, return_values, hp
 
-def _bind_user_function_args(call_node, arg_types, arg_names, memory, namespace, types, t, helper, sp):
+def _bind_user_function_args(call_node, arg_types, arg_names, ltc):
     """Load user-function arguments into the current frame namespace."""
     # We do not need to check argument count or types here, as that should have been done by user_function.validate_args() already. We just need to load the values into memory and bind their addresses in the namespace.
     for idx, (expected_type, arg_name) in enumerate(zip(arg_types, arg_names)):
         argument_value = call_node.arguments[idx]
 
         var_addr = sp
-        sp = helper.load_to_mem(memory, argument_value, sp, expected_type)
-        namespace[len(namespace) - 1][arg_name] = {
+        sp = ltc.helper.load_to_mem(ltc.memory, argument_value, sp, expected_type)
+        ltc.namespace[len(ltc.namespace) - 1][arg_name] = {
             "type": expected_type,
             "addr": var_addr,
         }
 
     return sp
 
-def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values=None, stack_ptr=0, heap_ptr=0, execute_source_fn=None):
-    """Walk the tree/list and reduce operations. Returns updated stack pointer."""
-    if return_values is None:
-        return_values = []
+def evaluate(tokens, ltc, return_values, execute_source_fn):
+    """Walk the tree/list and reduce operations. Returns updated stack pointer.
+    Params: tokens, ltc, return_values, execute_source_fn."""
 
-    sp = stack_ptr
-    hp = heap_ptr
+    sp = ltc.sp
+    hp = ltc.hp
+    n = ltc.n
+    t = ltc.t
+    helper = ltc.helper
     i = 0
     while i < len(tokens):
         if isinstance(tokens[i], n.oper | n.mono_oper):
-            retry_current, sp = resolve_opers(tokens, i, t, n, helper, namespace, memory, types, sp, user_functions, stack_frames, return_values, evaluate, execute_source_fn)
+            retry_current, sp = resolve_opers(tokens, return_values, evaluate, execute_source_fn)
             if retry_current:
                 continue
 
         if isinstance(tokens[i], n.subexp):
-            sp, return_values, hp = evaluate(tokens[i].val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
+            sp, return_values, hp = evaluate(tokens[i].val, ltc, return_values, execute_source_fn)
             if len(tokens[i].val) != 1:
                 raise TypeError(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
@@ -61,11 +65,11 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                     tokens[i].args[arg_idx] = arg_val
                     continue
 
-                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
+                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, ltc, return_values, execute_source_fn)
                 # Do not force all function args to be runtime values here.
                 # `let` intentionally carries identifier/operator tokens through to function_processing.
                 tokens[i].args[arg_idx] = reduced
-            sp, return_values, hp = function_processing(tokens, i, memory, namespace, types, t, helper, stack_frames, return_values, sp, hp, n)
+            sp, return_values, hp = function_processing(tokens, i, ltc, return_values)
             if isinstance(tokens[i], t.function) and tokens[i].val == "return":
                 return sp, return_values, hp
 
@@ -74,17 +78,17 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
                 raise RuntimeError("user_function execution requires execute_source_fn")
 
             for arg_idx, arg_val in enumerate(tokens[i].arguments):
-                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
+                reduced, sp, return_values, hp = _reduce_argument_value(arg_val, ltc, return_values, execute_source_fn)
                 tokens[i].arguments[arg_idx] = reduced
 
-            tokens[i].validate_args(user_functions)
-            arg_types, arg_names, body_source = helper._get_user_function_meta(user_functions, tokens[i].val)
+            tokens[i].validate_args(ltc.user_functions)
+            arg_types, arg_names, body_source = helper._get_user_function_meta(ltc.user_functions, tokens[i].val)
 
-            helper.create_frame(stack_frames, sp, namespace)
-            sp = _bind_user_function_args(tokens[i], arg_types, arg_names, memory, namespace, types, t, helper, sp)
+            helper.create_frame(ltc)
+            sp = _bind_user_function_args(tokens[i], arg_types, arg_names, ltc)
             local_returns = []
-            sp, local_returns, hp = execute_source_fn(body_source, memory, namespace, types, stack_frames, sp, hp, user_functions, local_returns)
-            sp = helper.destroy_frame(stack_frames, namespace)
+            sp, local_returns, hp = execute_source_fn(body_source, ltc, local_returns)
+            sp = helper.destroy_frame(ltc)
 
             if local_returns:
                 tokens[i] = local_returns[0]
@@ -95,10 +99,13 @@ def evaluate(tokens, memory, namespace, types, n, t, helper, user_functions, sta
 
     return sp, return_values, hp
 
-def function_processing(tokens, i, memory, namespace, types: dict, t, helper, stack_frames, return_values, stack_ptr, heap_ptr, n) -> tuple[int, list]:
+def function_processing(tokens, i, ltc, return_values) -> tuple[int, list]:
     """Process built-ins and return updated stack pointer."""
-    sp = stack_ptr
-    hp = heap_ptr
+    sp = ltc.stack_ptr
+    hp = ltc.heap_ptr
+    t = ltc.t
+    helper = ltc.helper
+    n = ltc.n
     match tokens[i].val:
         case "printf":
             if len(tokens[i].args) != 1:
@@ -133,7 +140,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
                 if not (isinstance(equals_arg, t.token) and equals_arg.val == "="):
                     raise SyntaxError("let expects '=' as the third argument")
 
-                if type(var_value_arg) != types[var_type_arg.val]:
+                if type(var_value_arg) != ltc.types[var_type_arg.val]:
                     raise TypeError(
                         f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"
                     )
@@ -148,26 +155,26 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
                             f"Let statement tried to declare {var_type_arg.arrayType}[{var_type_arg.size}] "
                             f"but was assigned {var_value_arg.arrayType}[{len(var_value_arg.val)}]"
                         )
-                    sp = helper.load_to_mem(memory, var_value_arg, sp, "array")
+                    sp = helper.load_to_mem(ltc.memory, var_value_arg, sp, "array")
                 else:
-                    sp = helper.load_to_mem(memory, var_value_arg, sp, var_type_arg.val)
+                    sp = helper.load_to_mem(ltc.memory, var_value_arg, sp, var_type_arg.val)
             else:
                 if isinstance(var_type_arg, t.array):
                     empty_array = t.array([], arrayType=var_type_arg.arrayType, parse=False)
                     empty_array.size = var_type_arg.size
-                    sp = helper.load_to_mem(memory, empty_array, sp, "array")
+                    sp = helper.load_to_mem(ltc.memory, empty_array, sp, "array")
                 else:
-                    sp = helper.load_to_mem(memory, helper.recieve_empty_form(t, var_type_arg.val), sp, var_type_arg.val)
+                    sp = helper.load_to_mem(ltc.memory, helper.recieve_empty_form(t, var_type_arg.val), sp, var_type_arg.val)
             
             if isinstance(var_type_arg, t.array):
-                namespace[len(namespace) - 1][var_name_arg.val] = {
+                ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
                     "type": "array",
                     "addr": var_mem_addr,
                     "length": var_type_arg.size,
                     "elem_type": var_type_arg.arrayType,
                 }
             else:
-                namespace[len(namespace) - 1][var_name_arg.val] = {
+                ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
                     "type": var_type_arg.val,
                     "addr": var_mem_addr,
                 }
@@ -271,7 +278,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
             if not isinstance(array_index, t.i32):
                 raise TypeError("aSet index must be a i32")
 
-            var_data = helper.locate_var_in_namespace(namespace, array_ref.val, return_just_the_check=False)
+            var_data = helper.locate_var_in_namespace(ltc.namespace, array_ref.val, return_just_the_check=False)
             var_meta = var_data[0]
             if var_meta is None:
                 raise NameError(f"Variable '{array_ref.val}' not found")
@@ -290,13 +297,13 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
             match elem_type:
                 case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
                     elem_addr = base_addr + (array_index.val * helper.integer_type_to_size(elem_type))
-                    helper.load_to_mem(memory, new_value, sp, elem_type, memidx=elem_addr)
+                    helper.load_to_mem(ltc.memory, new_value, sp, elem_type, memidx=elem_addr)
                 case "boolean":
                     elem_addr = base_addr + array_index.val
-                    helper.load_to_mem(memory, new_value, sp, "boolean", memidx=elem_addr)
+                    helper.load_to_mem(ltc.memory, new_value, sp, "boolean", memidx=elem_addr)
                 case "char":
                     elem_addr = base_addr + array_index.val
-                    helper.load_to_mem(memory, new_value, sp, "char", memidx=elem_addr)
+                    helper.load_to_mem(ltc.memory, new_value, sp, "char", memidx=elem_addr)
                 case _:
                     raise TypeError(f"aSet does not support element type '{elem_type}' yet")
 
@@ -308,7 +315,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
             return_values = [tokens[i].args[0]]
         
         case "cast":
-            resolve_cast_function(tokens, i, t, helper)
+            resolve_cast_function(tokens, i, ltc)
         
         case "malloc":
             if len(tokens[i].args) != 1:
@@ -329,7 +336,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
                 f.write(f"Stack Pointer: {sp}\n===============================\n")
                 f.write(f"Heap Pointer: {hp}\n===============================\n")
                 f.write("memory:\n")
-                for i, v in enumerate(memory):
+                for i, v in enumerate(ltc.memory):
                     if i == sp:
                         f.write(f"  [{i}]: {v}  <-- SP\n")
                     elif i == hp:
@@ -337,7 +344,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
                     else:
                         f.write(f"  [{i}]: {v}\n")
                 f.write(f"===============================\n")
-                f.write(f"namespace: {namespace}\n")
+                f.write(f"namespace: {ltc.namespace}\n")
             f.close()
         
         case "exit":
@@ -357,7 +364,7 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
 
             if not isinstance(ptr_arg, t.ptr):
                 raise TypeError(f"First argument to @ must be a pointer, got {type(ptr_arg).__name__}")
-            if (not isinstance(type_arg, t.token)) or (not type_arg.val in types.keys()):
+            if (not isinstance(type_arg, t.token)) or (not type_arg.val in ltc.types.keys()):
                 raise TypeError(f"Second argument to @ must be a type name, instead got {type_arg.val}")
             
             match type_arg.val:
@@ -371,12 +378,13 @@ def function_processing(tokens, i, memory, namespace, types: dict, t, helper, st
                 case _:
                     raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
                     
-            ptr_deref = helper.read_ltc_type_from_mem(memory, ptr_arg.val, type_arg.val, t) # returns the obj read from memory
+            ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_arg.val, type_arg.val, t) # returns the obj read from memory
 
             tokens[i] = n.at_func_return(ptr_deref, ptr_arg.val, type_size) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
     return sp, return_values, hp
 
-def resolve_cast_function(tokens: list, i: int, t: object, helper: object):
+def resolve_cast_function(tokens: list, i: int, ltc):
+    t = ltc.t
     if len(tokens[i].args) != 2:
         raise SyntaxError(f"cast expects exactly two arguments, not {len(tokens[i].args)}")
     

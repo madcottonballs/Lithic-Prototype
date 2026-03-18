@@ -59,33 +59,34 @@ class at_func_return:
         self.type_size = type_size
 
 # mother function
-def generate_trees(t, function_names, helper, tokens, namespace, memory, user_functions, types, start_index=0):
+def generate_trees(tokens, ltc, start_index=0):
     # Non-list inputs are already single nodes and do not need list-based passes.
     if not isinstance(tokens, list):
         return
 
     # Pass 0: collapse array type declarations like `i32[4]` into one array token.
-    _build_array_type_tokens(tokens, t, start_index)
+    _build_array_type_tokens(tokens, ltc.t, start_index)
 
     # Pass 1: collapse raw parenthesized ranges into `subexp` nodes.
-    build_subexp(start_index, tokens, helper, t, function_names, namespace, memory, user_functions, types)
+    build_subexp(start_index, tokens, ltc)
     # Pass 1.25: collapse array literals like `[1, 2]` into one `array` token.
-    _build_array_literals(tokens, t, function_names, helper, namespace, memory, start_index)
+    _build_array_literals(tokens, ltc, start_index)
     # Pass 1.5: convert let statements in intended syntax to a function node.
     # Examples:
     #   let i32 x = 5  -> function("let", [i32, x, =, 5])
     #   let i32 x      -> function("let", [i32, x])
-    _build_let_stmts(start_index, tokens, t, function_names, helper, namespace, memory, user_functions, types)
+    _build_let_stmts(start_index, tokens, ltc)
 
-    _build_opers(t, function_names, helper, tokens, namespace, memory, start_index, user_functions, types)
+    _build_opers(tokens, start_index, ltc)
 
-    _dereference_vars(start_index, tokens, t, helper, namespace, memory)
+    _dereference_vars(start_index, tokens, ltc)
     
-    _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names, namespace, memory, user_functions, types)
+    _build_add_sub_mult_div_nodes(start_index, tokens, ltc)
+    _build_indexing(start_index, tokens, ltc)
 
-    _build_indexing(start_index, t, function_names, helper, tokens, namespace, memory)
-
-def _build_indexing(start_index, t, function_names, helper, tokens, namespace, memory):
+def _build_indexing(start_index, tokens, ltc):
+    t = ltc.t
+    helper = ltc.helper
     index = start_index
     while index < len(tokens):
 
@@ -96,21 +97,23 @@ def _build_indexing(start_index, t, function_names, helper, tokens, namespace, m
         next_token = tokens[index + 1]
         if type(current_token).__name__ == "array":
             if type(next_token).__name__ == "array" and next_token.get_size() == 1: # condition of ex. [5, 3, 2][0] -> should return 5
-                _build_array_indexing(current_token, next_token, t, helper, namespace, memory, tokens, index)
+                _build_array_indexing(current_token, next_token, tokens, index, ltc)
         if type(current_token).__name__ == "string":
             if type(next_token).__name__ == "array" and next_token.get_size() == 1: # condition of ex. "hello"[0] -> should return 'h'
-                _build_string_indexing(current_token, next_token, t, helper, namespace, memory, tokens, index)
+                _build_string_indexing(current_token, next_token, tokens, index, ltc)
 
         index += 1
 
-def _build_array_indexing(current_token, next_token, t, helper, namespace, memory, tokens, index):
+def _build_array_indexing(current_token, next_token, tokens, index, ltc):
+    t = ltc.t
+    helper = ltc.helper
     index_value_token = next_token.val[0]
     if isinstance(index_value_token, t.var_ref):
-        index_value_token = helper.dereference_var(t, namespace, memory, index_value_token)
+        index_value_token = helper.dereference_var(ltc, index_value_token)
     elif isinstance(index_value_token, t.token):
         # Handle unresolved plain tokens defensively.
-        if helper.locate_var_in_namespace(namespace, index_value_token.val, return_just_the_check=True):
-            index_value_token = helper.dereference_var(t, namespace, memory, t.var_ref(index_value_token.val))
+        if helper.locate_var_in_namespace(ltc.namespace, index_value_token.val, return_just_the_check=True):
+            index_value_token = helper.dereference_var(ltc, t.var_ref(index_value_token.val))
         elif str(index_value_token.val).isdigit():
             index_value_token = t.i32(index_value_token.val)
 
@@ -136,14 +139,16 @@ def _build_array_indexing(current_token, next_token, t, helper, namespace, memor
         case _:
             raise TypeError("Unsupported type of array used for array indexing")
 
-def _resolve_index_token_to_dword(index_token, t, helper, namespace, memory):
+def _resolve_index_token_to_dword(index_token, ltc):
     """Resolve index token to i32 for indexed write rewrites."""
+    t = ltc.t
+    helper = ltc.helper    
     resolved_index = index_token
     if isinstance(resolved_index, t.var_ref):
-        resolved_index = helper.dereference_var(t, namespace, memory, resolved_index)
+        resolved_index = helper.dereference_var(ltc, resolved_index)
     elif isinstance(resolved_index, t.token):
-        if helper.locate_var_in_namespace(namespace, resolved_index.val, return_just_the_check=True):
-            resolved_index = helper.dereference_var(t, namespace, memory, t.var_ref(resolved_index.val))
+        if helper.locate_var_in_namespace(ltc.namespace, resolved_index.val, return_just_the_check=True):
+            resolved_index = helper.dereference_var(ltc, t.var_ref(resolved_index.val))
         elif str(resolved_index.val).isdigit():
             resolved_index = t.i32(resolved_index.val)
 
@@ -152,14 +157,15 @@ def _resolve_index_token_to_dword(index_token, t, helper, namespace, memory):
 
     return resolved_index
 
-def build_array_set_call(t, helper, tokens, lhs_ref, lhs_index_array, rhs_value, namespace, memory):
+def build_array_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
+    t = ltc.t
     """Build aSet(arrayRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
         raise TypeError("Indexed assignment requires a variable reference as the array base")
     if not isinstance(lhs_index_array, t.array) or lhs_index_array.get_size() != 1:
         raise SyntaxError("Indexed assignment expects exactly one index: arr[idx]")
 
-    index_token = _resolve_index_token_to_dword(lhs_index_array.val[0], t, helper, namespace, memory)
+    index_token = _resolve_index_token_to_dword(lhs_index_array.val[0], ltc)
     args = [
         lhs_ref,
         t.token(","),
@@ -170,14 +176,17 @@ def build_array_set_call(t, helper, tokens, lhs_ref, lhs_index_array, rhs_value,
 
     return t.function("aSet", args)
 
-def _build_string_indexing(current_token, next_token, t, helper, namespace, memory, tokens, index):
+def _build_string_indexing(current_token, next_token, tokens, index, ltc):
+    t = ltc.t
+    helper = ltc.helper
+
     index_value_token = next_token.val[0]
     if isinstance(index_value_token, t.var_ref):
-        index_value_token = helper.dereference_var(t, namespace, memory, index_value_token)
+        index_value_token = helper.dereference_var(ltc, index_value_token)
     elif isinstance(index_value_token, t.token):
         # Handle unresolved plain tokens defensively.
-        if helper.locate_var_in_namespace(namespace, index_value_token.val, return_just_the_check=True):
-            index_value_token = helper.dereference_var(t, namespace, memory, t.var_ref(index_value_token.val))
+        if helper.locate_var_in_namespace(ltc.namespace, index_value_token.val, return_just_the_check=True):
+            index_value_token = helper.dereference_var(ltc, t.var_ref(index_value_token.val))
         elif str(index_value_token.val).isdigit():
             index_value_token = t.i32(index_value_token.val)
 
@@ -192,7 +201,8 @@ def _build_string_indexing(current_token, next_token, t, helper, namespace, memo
     element = current_token.val[array_index]
     tokens[index:index + 2] = [t.char(element.val if hasattr(element, "val") else element)]
 
-def _build_let_stmts(start_index, tokens, t, function_names, helper, namespace, memory, user_functions, types):
+def _build_let_stmts(start_index, tokens, ltc):
+    t = ltc.t
     index = start_index
     while index < len(tokens):
         symbol = getattr(tokens[index], "val", None)
@@ -215,7 +225,7 @@ def _build_let_stmts(start_index, tokens, t, function_names, helper, namespace, 
                     raise SyntaxError("let assignment expects syntax: let [type] [varname] = [value]")
 
                 rhs_tokens = tokens[index + 4:]
-                generate_trees(t, function_names, helper, rhs_tokens, namespace, memory, user_functions, types, 0)
+                generate_trees(rhs_tokens, ltc, 0)
                 if len(rhs_tokens) != 1:
                     raise SyntaxError("let assignment RHS did not reduce to a single value")
 
@@ -265,7 +275,7 @@ def _build_array_type_tokens(tokens, t, start_index=0):
         tokens[index:index + 4] = [array_type_token]
         # Do not increment index so chained patterns still get parsed correctly.
 
-def _build_array_literals(tokens, t, function_names, helper, namespace, memory, types, start_index=0):
+def _build_array_literals(tokens, ltc, start_index=0):
     """Convert `[elem1, elem2, ...]` into one `t.array` token."""
     index = start_index
     while index < len(tokens):
@@ -295,20 +305,24 @@ def _build_array_literals(tokens, t, function_names, helper, namespace, memory, 
             raise SyntaxError("No closing ']' found for array literal")
 
         element_tokens = tokens[index + 1:close_index]
-        generate_trees(t, function_names, helper, element_tokens, namespace, memory, types, 0)
-        array_literal = t.array(element_tokens)
+        generate_trees(element_tokens, ltc, 0)
+        array_literal = ltc.t.array(element_tokens)
         tokens[index:close_index + 1] = [array_literal]
         index += 1
 
-def _dereference_vars(start_index, tokens, t, helper, namespace, memory):
+def _dereference_vars(start_index, tokens, ltc):
+    t = ltc.t
+    helper = ltc.helper    
     index = start_index
     # Pass 2: dereference variables.
     while index < len(tokens):
         if isinstance(tokens[index], t.var_ref):
-            tokens[index] = helper.dereference_var(t, namespace, memory, tokens[index])
+            tokens[index] = helper.dereference_var(ltc, tokens[index])
         index += 1
 
-def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names, namespace, memory, user_functions, types):
+def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
+    t = ltc.t
+    helper = ltc.helper
     index = start_index
 
     def _is_unary_context(operator_index: int) -> bool:
@@ -340,13 +354,13 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names
             # Replace "left op right" with one operator node.
             tokens[index - 1:index + 2] = [operation_node]
             # Ensure the right side is also reduced if it is complex.
-            generate_trees(t, function_names, helper, operation_node.node2, namespace, memory, user_functions, types, 0)
+            generate_trees(operation_node.node2, ltc, 0)
 
         elif symbol == "/":
             helper.validate_operator(tokens, index, "/")
             operation_node = div(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
-            generate_trees(t, function_names, helper, operation_node.node2, namespace, memory, user_functions, types, 0)
+            generate_trees(operation_node.node2, ltc, 0)
 
         else:
             # Advance only when we did not collapse a slice.
@@ -367,7 +381,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names
             helper.validate_operator(tokens, index, "+")
             operation_node = add(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
-            generate_trees(t, function_names, helper, operation_node.node2, namespace, memory, user_functions, types, 0)
+            generate_trees(operation_node.node2, ltc, 0)
 
         elif symbol == "-":
             if _is_unary_context(index):
@@ -391,20 +405,20 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, helper, t, function_names
 
                 operation_node = sub(zero_node, unary_rhs)
                 tokens[index:index + 2] = [operation_node]
-                generate_trees(t, function_names, helper, operation_node.node2, namespace, memory, user_functions, types, 0)
+                generate_trees(operation_node.node2, ltc, 0)
                 continue
 
             # Binary subtraction.
             helper.validate_operator(tokens, index, "-")
             operation_node = sub(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
-            generate_trees(t, function_names, helper, operation_node.node2, namespace, memory, user_functions, types, 0)
+            generate_trees(operation_node.node2, ltc, 0)
 
         else:
             # Advance only when we did not collapse a slice.
             index += 1
 
-def _build_opers(t, function_names, helper, tokens, namespace, memory, start_idx, user_functions, types):
+def _build_opers(tokens, start_idx, ltc):
     index = start_idx
     while index < len(tokens):
         symbol = getattr(tokens[index], "val", None)
@@ -422,9 +436,9 @@ def _build_opers(t, function_names, helper, tokens, namespace, memory, start_idx
                 next_symbol = getattr(tokens[index + 1], "val", None)
                 match next_symbol: # next token
                     case "=": # '==' equality operator
-                        build_equal_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_equal_oper(tokens, index, ltc)
                     case _: # '=' assignment operator
-                        build_assign_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_assign_oper(tokens, index, ltc)
             case "!":
 
                 match tokens[index + 1].val: # next token 
@@ -433,47 +447,47 @@ def _build_opers(t, function_names, helper, tokens, namespace, memory, start_idx
                         pass
                     case "=": # '!=' not equal to operator
                         _check_oper_syntax_errors('!=', tokens, index)
-                        build_not_equal_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_not_equal_oper(tokens, index, ltc)
                     case _: # '!' boolean invert operator
                         if index + 1 >= len(tokens):
                             raise SyntaxError("operator `!` must be followed by a value.")
                         
-                        build_invert_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_invert_oper(tokens, index, ltc)
             case ">":
                 _check_oper_syntax_errors('>', tokens, index)
                 next_symbol = getattr(tokens[index + 1], "val", None)
                 if next_symbol == "=":
-                    build_greater_equal_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                    build_greater_equal_oper(tokens, index, ltc)
                 else:
-                    build_greater_oper(t, function_names, helper, tokens, index, namespace, memory)
+                    build_greater_oper(tokens, index, ltc)
             case "<":
                 _check_oper_syntax_errors('<', tokens, index)
                 next_symbol = getattr(tokens[index + 1], "val", None)
                 if next_symbol == "=":
-                    build_less_equal_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                    build_less_equal_oper(tokens, index, ltc)
                 else:
-                    build_less_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                    build_less_oper(tokens, index, ltc)
             case "+":
                 match tokens[index + 1].val: # next token 
                     case "=": # '+=' 
                         _check_oper_syntax_errors('+=', tokens, index)
-                        build_var_add_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_var_add_oper(tokens, index, ltc)
                     case "+": # '++' increment operator
                         _check_oper_syntax_errors('++', tokens, index)
-                        build_increment_oper(t, helper, tokens, index, namespace, memory)
+                        build_increment_oper(tokens, index, ltc)
                     case _: # '+' add operator
                         pass # handled at a different time
             case "-":
                 match tokens[index + 1].val: # next token 
                     case "=": # '-=' 
                         _check_oper_syntax_errors('-=', tokens, index)
-                        build_var_sub_oper(t, function_names, helper, tokens, index, namespace, memory, user_functions, types)
+                        build_var_sub_oper(tokens, index, ltc)
                     case "-": # '--' decrement operator
                         _check_oper_syntax_errors('--', tokens, index)
-                        build_decrement_oper(t, helper, tokens, index, namespace, memory)
+                        build_decrement_oper(tokens, index, ltc)
                     case ">": # -> arrow operator for type casting
                         _check_oper_syntax_errors('->', tokens, index)
-                        build_cast_oper(t, tokens, index, types)
+                        build_cast_oper(tokens, index, ltc)
                         index -= 1  # re-scan after in-place replacement
                     case _: # '+' add operator
                         pass # handled at a different time

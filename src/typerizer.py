@@ -264,7 +264,7 @@ class user_function():
                     f"but got '{actual_type_name}'"
                 )
 
-def parser(tokens, namespace, helper, user_functions):
+def parser(tokens, ltc): # tokens is not always ltc.tokens
     default_int = i32
     # Convert raw token strings into typed token nodes.
     for token_index, token_text in enumerate(tokens):
@@ -272,7 +272,7 @@ def parser(tokens, namespace, helper, user_functions):
         char_index = 0
 
         # handle variable references
-        if helper.locate_var_in_namespace(namespace, token_text, return_just_the_check=True):
+        if ltc.helper.locate_var_in_namespace(ltc.namespace, token_text, return_just_the_check=True):
             tokens[token_index] = var_ref(token_text)
             continue
 
