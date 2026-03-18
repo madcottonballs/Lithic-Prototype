@@ -1,6 +1,6 @@
 define test() {
-    let ptr x = malloc(10);
-    return(x);    
+    let ptr h = malloc(10);
+    return(h);    
 }
 define main() { 
     let i32 x = 6;

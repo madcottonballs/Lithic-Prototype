@@ -9,6 +9,8 @@ def _reduce_argument_value(argument, memory, namespace, types, n, t, helper, use
         temp = [value]
         sp, return_values, hp = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, sp, hp, execute_source_fn)
         value = temp[0]
+        if isinstance(value, t.var_ref):
+            value = helper.dereference_var(t, namespace, memory, value)
     elif isinstance(value, t.var_ref):
         value = helper.dereference_var(t, namespace, memory, value)
 
@@ -127,6 +129,7 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
 
                 if not (isinstance(equals_arg, t.token) and equals_arg.val == "="):
                     raise SyntaxError("let expects '=' as the third argument")
+
                 if type(var_value_arg) != types[var_type_arg.val]:
                     raise TypeError(
                         f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"

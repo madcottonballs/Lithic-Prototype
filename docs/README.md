@@ -4,9 +4,7 @@
 * Function parameters aren't working with arrays
 * Cannot do indexed string assignment
 * cannot dereference ptrs
-* Must add heap
-* Must change malloc() to use heap
-* var dereferencing isnt working
+* var scoping is broken
 
 # Details
 * This is a prototype of a minimalist imperative programming language.

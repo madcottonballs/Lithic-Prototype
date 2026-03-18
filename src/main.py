@@ -5,8 +5,8 @@ import typerizer as t
 import tokenizer as tokenizer
 import preproccesor
 
-def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, hp, user_functions, return_values):
-    """Execute one non-control-flow statement and return updated stack pointer."""
+def execute_statement(stmt: str, memory, namespace, types, stack_frames, sp, hp, user_functions, return_values) -> tuple[int, list, int]:
+    """Execute one non-control-flow statement and return (updated_sp, return_values, updated_hp)."""
     stmt = stmt.strip()
     if not stmt:
         return sp, return_values, hp
@@ -22,7 +22,7 @@ def evaluate_condition(condition_expr: str, memory, namespace, types, sp, user_f
     tokens = tokenizer.lexer(condition_expr)
     t.parser(tokens, namespace, helper, user_functions)
     noderizer.generate_trees(t, function_names, helper, tokens, namespace, memory, user_functions, types)
-    sp, _ = evaluator.evaluate(tokens, memory, namespace, types, noderizer, t, helper, user_functions, stack_frames, [], sp, execute_source)
+    sp, _, _ = evaluator.evaluate(tokens, memory, namespace, types, noderizer, t, helper, user_functions, stack_frames, [], sp, execute_source)
 
     if len(tokens) != 1:
         raise SyntaxError("condition must reduce to a single value")
@@ -86,9 +86,9 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
 
     return function_name, arg_types, arg_names, function_body, block_close_index + 1
 
-def execute_source(source_text: str, memory, namespace, types, stack_frame: list[int], sp: int, hp: int, functions: dict[str, list], return_values) -> (int | list):
+def execute_source(source_text: str, memory, namespace, types, stack_frame: list[int], sp: int, hp: int, functions: dict[str, list], return_values) -> (int | list | int):
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
-    \n Returns updated sp and optionally return value(s) if executing a function body."""
+    \n Returns (sp, return value(s) if executing a function body, hp)."""
     source_text = helper.strip_comments(source_text)
     source_text = preproccesor.process_imports(source_text)
     cursor = 0
@@ -100,7 +100,7 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
         if cursor >= source_length:
             break
 
-        if helper.is_controlflow_keyword_at(source_text, cursor, "def", get_paren=False):
+        if helper.is_controlflow_keyword_at(source_text, cursor, "define", get_paren=False):
             function_name, arg_types, arg_names, function_body, next_cursor = _parse_function_declaration(source_text, cursor)
             functions[function_name] = {
                 "arg_types": arg_types,
@@ -116,7 +116,7 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
             condition_true, sp = evaluate_condition(condition_expression, memory, namespace, types, sp, functions, stack_frame)
             while condition_true:
                 helper.create_frame(stack_frame, sp, namespace)
-                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
+                sp, return_values, hp = execute_source(block_source, memory, namespace, types, stack_frame, sp, functions, return_values)
                 sp = helper.destroy_frame(stack_frame, namespace)
                 condition_true, sp = evaluate_condition(condition_expression, memory, namespace, types, sp, functions, stack_frame)
 
@@ -127,17 +127,17 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
             iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor)
 
             helper.create_frame(stack_frame, sp, namespace)
-            sp, return_values = execute_statement(f"let i32 {iterator_name} = 0", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+            sp, return_values, hp = execute_statement(f"let i32 {iterator_name} = 0", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
 
             condition_true, sp = evaluate_condition(f"{iterator_name} < {end_value}", memory, namespace, types, sp, functions, stack_frame)
             while condition_true:
                 helper.create_frame(stack_frame, sp, namespace)
-                sp, return_values = execute_source(block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
-                sp, return_values = execute_statement(f"{iterator_name}++", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                sp, return_values, hp = execute_source(block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                sp, return_values, hp = execute_statement(f"{iterator_name}++", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                 sp = helper.destroy_frame(stack_frame, namespace)
                 condition_true, sp = evaluate_condition(f"{iterator_name} < {end_value}", memory, namespace, types, sp, functions, stack_frame)
 
-            sp, return_values = execute_statement(f"{iterator_name}^", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+            sp, return_values, hp = execute_statement(f"{iterator_name}^", memory, namespace, types, stack_frame, sp, hp, functions, return_values)
             sp = helper.destroy_frame(stack_frame, namespace)
 
             cursor = next_cursor
@@ -172,17 +172,17 @@ def execute_source(source_text: str, memory, namespace, types, stack_frame: list
                 else_block_source, after_else_cursor = helper.parse_else_block(source_text, else_cursor)
                 if condition_true:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                    sp, return_values, hp = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 else:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(else_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                    sp, return_values, hp = execute_source(else_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 cursor = after_else_cursor
             else:
                 if condition_true:
                     helper.create_frame(stack_frame, sp, namespace)
-                    sp, return_values = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
+                    sp, return_values, hp = execute_source(if_block_source, memory, namespace, types, stack_frame, sp, hp, functions, return_values)
                     sp = helper.destroy_frame(stack_frame, namespace)
                 cursor = next_cursor
             continue

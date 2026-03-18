@@ -469,6 +469,7 @@ def _build_opers(t, function_names, helper, tokens, namespace, memory, start_idx
                     case ">": # -> arrow operator for type casting
                         _check_oper_syntax_errors('->', tokens, index)
                         build_cast_oper(t, tokens, index, types)
+                        index -= 1  # re-scan after in-place replacement
                     case _: # '+' add operator
                         pass # handled at a different time
             case "^":

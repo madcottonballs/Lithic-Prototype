@@ -1,0 +1,20 @@
+define main() {
+    let i32 x = 6;
+    if (x -> string == "6") {
+        printf("Integer -> String cast successful.");
+    } else {
+        printf("Integer -> String cast failed.");
+    }
+    if (x -> boolean == true) {
+        printf("Integer -> Boolean cast successful.");
+    } else {
+        printf("Integer -> Boolean cast failed.");
+    }
+    if (x -> string -> char == '6') {
+        printf("Integer -> String cast successful.");
+    } else {
+        printf("Integer -> String cast failed.");
+    }
+
+    return(0);
+}

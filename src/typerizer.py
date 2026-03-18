@@ -116,7 +116,7 @@ class integer(ltc_type):
         elif isinstance(val, float) and val.is_integer():
             self.val = int(val)
         else:
-            self.val = val
+            self.val = int(val)
         self.size = None
         self.signed = None
     def load_to_memory(self, memory, addr):
@@ -131,7 +131,7 @@ class integer(ltc_type):
             self.min_val = 0
             self.max_val = (2 ** (self.size * 8)) - 1
 
-        if not (self.min_val <= self.val <= self.max_val):
+        if not ((self.min_val) <= (self.val) <= (self.max_val)):
             raise OverflowError(f"Integer '{self.val}' exceeds the range of type with size {self.size} bytes and signed={self.signed}")
 class i32(integer): # i32
     def __init__(self, val):
@@ -200,7 +200,9 @@ class u16(integer): # u16
 class ptr(u64): # ptr (64-bit unsigned integer representing a memory address)
     def __init__(self, val):
         super().__init__(val)
-    
+    def read_from_memory(self, memory, addr):
+        return ptr(super().read_from_memory(memory, addr).val) # ptr is a wrapper around u64, so we need to extract the integer value and wrap it back in a ptr
+   
 class var_ref(token):
     pass
 

@@ -142,7 +142,7 @@ def resolve_bool_oper(tokens, i, t, n, helper, namespace, memory, types, oper: s
     lhs = tokens[i].node1
     if isinstance(lhs, n.oper | n.subexp | t.function):
         temp = [lhs]
-        _, _ = evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, evaluate, execute_source_fn)
+        evaluate(temp, memory, namespace, types, n, t, helper, user_functions, stack_frames, return_values, stack_ptr, evaluate, execute_source_fn)
         lhs = temp[0]
     elif isinstance(lhs, t.var_ref):
         lhs = helper.dereference_var(t, namespace, memory, lhs)

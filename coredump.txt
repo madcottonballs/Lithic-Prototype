@@ -1,5 +1,5 @@
 ===CORE DUMP===
-Stack Pointer: 28
+Stack Pointer: 36
 ===============================
 Heap Pointer: 55
 ===============================
@@ -32,7 +32,7 @@ memory:
   [25]: 0
   [26]: 0
   [27]: 0
-  [28]: 55  <-- SP
+  [28]: 55
   [29]: 0
   [30]: 0
   [31]: 0
@@ -40,7 +40,7 @@ memory:
   [33]: 0
   [34]: 0
   [35]: 0
-  [36]: 0
+  [36]: 0  <-- SP
   [37]: 0
   [38]: 0
   [39]: 0
@@ -76,4 +76,4 @@ memory:
   [69]: 0
   [70]: 0
 ===============================
-namespace: [{}, {'x': {'type': 'i32', 'addr': 0}, 'str': {'type': 'string', 'addr': 4}, 'b': {'type': 'boolean', 'addr': 18}, 'c': {'type': 'char', 'addr': 19}, 'p': {'type': 'ptr', 'addr': 20}}]
+namespace: [{}, {'x': {'type': 'i32', 'addr': 0}, 'str': {'type': 'string', 'addr': 4}, 'b': {'type': 'boolean', 'addr': 18}, 'c': {'type': 'char', 'addr': 19}, 'p': {'type': 'ptr', 'addr': 20}, 'g': {'type': 'ptr', 'addr': 28}}]
