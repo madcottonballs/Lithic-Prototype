@@ -214,7 +214,8 @@ function_names = [
     "return",
     "cast",
     "malloc",
-    "coredump"
+    "coredump",
+    "exit"
 ]
 
 

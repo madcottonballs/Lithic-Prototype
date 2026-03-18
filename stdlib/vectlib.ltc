@@ -1,0 +1,56 @@
+vectors.ltc:
+
+include<dw.ltc>;
+include<bool.ltc>;
+include<chr.ltc>;
+include<>
+
+dw.ltc:
+
+define make(string type, dword size) {
+    let dword allocated = size * 2 + 2;                  /* buffer is for [allocated][size]*/	
+    let dword[allocated] instance;
+	instance[0] = allocated;
+	instance[1] = size;
+    return(&instance);
+}
+
+define get(ptr instance, dword idx) {
+	let dword allocated = @(instance)
+	let dword size = @(instance + 1);
+	if (idx > size) {
+		printf(“tried to index outside of vector bounds”)
+		exit(1);
+    }
+    let dword return_value = @(instance + idx + 2);
+    return(return_value)
+}
+
+define append(ptr instance, dword val) {
+	let dword allocated = @(instance);
+	let dword full_byte_size = (2 * sizeof(dword)) + (allocated * sizeof(dword));
+	let dword size = @(instance + 1);
+	size++;
+    if (size > allocated) {
+        let ptr new_instance = dw_make(“dword”, size);
+        iterate (i, size) {
+            let dword ir = dw_get(instance, i);
+            dw_set(new_instance, ir);
+        }
+        return(new_instance);
+    }
+    else {
+        @(instance + 2 + size) = val;
+        return(instance);
+    }
+}
+
+define set(ptr instance, dword idx, dword new_val) {
+	let dword size = @(instance + 1);
+	if (idx > size) {
+		printf(“tried to index outside of vector bounds”)
+	exit(1);
+    }
+    @(instance + 2 + idx) = new_val;
+    return(0);
+}

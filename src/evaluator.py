@@ -336,6 +336,14 @@ def function_processing(tokens, i, memory, namespace, types, t, helper, stack_fr
                 f.write(f"===============================\n")
                 f.write(f"namespace: {namespace}\n")
             f.close()
+        
+        case "exit":
+            if len(tokens[i].args) != 1:
+                raise SyntaxError("exit expects exactly one argument")
+            arg = tokens[i].args[0]
+            if not isinstance(arg, t.integer):
+                raise TypeError(f"exit code argument must be an integer, got {type(arg).__name__}")
+            exit(arg.val)
 
     return sp, return_values, hp
 

@@ -1,6 +1,6 @@
 /*
 The dictlib uses a memory structure like this:
-[u8 size][ptr key][ptr value][ptr key][ptr value]...
+[u8 size][ptr to key][ptr to value][ptr to key][ptr to value]...
 */
 
 define makeDict() {

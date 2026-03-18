@@ -78,7 +78,7 @@
 ###		&[any]
 			Memloc operator.
 			Retrieves the address of the object in memory.
-			Only works on data stored in memory (like variables), not literals.
+			In the interpreter, will only work on data stored in memory (like variables), not literals.
 			Ex:
 ```
 				let i32 x = 5;
@@ -89,7 +89,7 @@
 			Cast operator converts the first obj into the type referenced.
 			Ex: 
 >			5 -> string		/* where 5 is a i32, then turns into a string */
-###		*[i32]~[i32]
+###		*[integer]~[integer]
 			Random operator returns a random number in range of the first i32 and second i32 (inclusive).
 			Ex: 
 >			 5~9		/* randomly selects either 5, 6, 7, 8, or 9 */
@@ -136,7 +136,7 @@
 			Adds the string you enter as a line in the intermeddiate generated Asm file.
 			Only works in translator versions that have Asm in the pipeline (compiler version).
 ##	Misc:
-###		*exit([i32])
+###		exit([integer])
 			Immediantly ends the program and returns the number as the exit code.
 ###		import [str]
 			Inlines the code in the .ltc file referenced by the string.
