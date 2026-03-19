@@ -18,7 +18,7 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             return True
     elif isinstance(tokens[i], n.oper):
         if isinstance(tokens[i], n.assign):
-            ltc.sp = resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
+            resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True
         if isinstance(tokens[i], n.equal):
             resolve_bool_oper(ltc, tokens, i, "==", return_values, evaluate, execute_source_fn)
@@ -97,7 +97,7 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
 
     return False
 
-def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
+def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None) -> None:
     """Resolve assignment"""
     t = ltc.t
     n = ltc.n
@@ -106,7 +106,7 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
 
     if isinstance(tokens[i].node1, t.function) and tokens[i].node1.val == "@":
         temp = [tokens[i].node1]
-        ltc.sp, _, ltc.hp = evaluate(temp, ltc, return_values, execute_source_fn)   # return_values can be ignored
+        evaluate(temp, ltc, return_values, execute_source_fn)   # return_values can be ignored
         tokens[i].node1 = temp[0]
 
     if isinstance(tokens[i].node1, n.at_func_return):

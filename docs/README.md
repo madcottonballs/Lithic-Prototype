@@ -3,9 +3,7 @@
 * Stack mechanism broke the free operator
 * Function parameters aren't working with arrays
 * Cannot do indexed string assignment
-* cannot dereference ptrs
 * var scoping is broken
-* malloc() isnt moving the hp in all instances due to incomplete processing of return values of evalulate() ex: (sp, _, _)
 
 # Details
 * This is a prototype of a minimalist imperative programming language.

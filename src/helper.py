@@ -69,6 +69,7 @@ def add_string_to_memory(string, memory, ltc) -> None:
     string.memloc = ltc.sp
     memory[ltc.sp:ltc.sp + len(byte_rep_of_str)] = byte_rep_of_str
     ltc.sp += len(byte_rep_of_str)
+    ltc.sp += len(byte_rep_of_str)
 
 def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str) -> int:
     """Return index of the closing delimiter matching opening_index.
@@ -368,7 +369,7 @@ def dereference_var(ltc, var_ref_token) -> object:
                         element_addr = addr + index
                         values.append(t.boolean(ltc.memory[element_addr] != 0))
                 case _:
-                    raise TypeError(f"Unsupported array element type: {elem_type}")
+                    ltc.error(ltc, f"Unsupported array element type: {elem_type}")
 
             array_obj = t.array(values, arrayType=elem_type, parse=False)
             array_obj.size = length
@@ -376,7 +377,7 @@ def dereference_var(ltc, var_ref_token) -> object:
             array_obj.memloc = addr                       # store the memory address in the array object (used for memloc oper)
             return array_obj
         case _:
-            raise TypeError(f"Unsupported variable type: {var_type}")
+            ltc.error(ltc, f"Unsupported variable type: {var_type}")
 
 def integer_type_to_size(type_name: str) -> int:
     """Helper function to get the byte size of an integer type."""
@@ -423,7 +424,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                 ltc.sp += integer_type_to_size(resolved_type)
         case "string":
             if memidx is None:
-                ltc.sp = add_string_to_memory(object, ltc.memory, ltc)
+                add_string_to_memory(object, ltc.memory, ltc)
             else:
                 byte_rep_of_str = object.val.encode('utf-8') + b'\x00'
                 ltc.memory[write_ptr:write_ptr + len(byte_rep_of_str)] = byte_rep_of_str
@@ -443,7 +444,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                     if memidx is None:
                         ltc.sp += element_width * object.get_size()
                 case "string":
-                    raise TypeError("strings are not currently supported for arrays")
+                    ltc.error(ltc, "strings are not currently supported for arrays")
                 case "boolean":
                     element_width = 1
                     for i, element in enumerate(object.val):
@@ -463,7 +464,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             if memidx is None:
                 ltc.sp += 8
         case _:
-            raise TypeError(f"Tried to load an unrecognized type '{resolved_type}' into memory")
+            ltc.error(ltc, f"Tried to load an unrecognized type '{resolved_type}' into memory")
     return
 
 def recieve_empty_form(t, type):
@@ -541,7 +542,7 @@ def strip_comments(source_text: str) -> str:
 
     return "".join(output_chars)
 
-def _get_user_function_meta(user_functions, function_name: str) -> tuple[list[str], list[str], str]:
+def _get_user_function_meta(user_functions, function_name: str, ltc) -> tuple[list[str], list[str], str]:
     """Return (arg_types, arg_names, body) for a user function."""
     if function_name not in user_functions:
         raise NameError(f"Function '{function_name}' is not declared")
@@ -557,24 +558,22 @@ def _get_user_function_meta(user_functions, function_name: str) -> tuple[list[st
         arg_names = [f"arg{i}" for i in range(len(arg_types))]
         body = entry[1] if len(entry) > 1 else ""
     else:
-        raise TypeError(f"Invalid function metadata for '{function_name}'")
+        ltc.error(ltc, f"Invalid function metadata for '{function_name}'")
 
     if len(arg_types) != len(arg_names):
         raise SyntaxError(f"Function '{function_name}' has mismatched arg type/name metadata")
     return arg_types, arg_names, body
 
-def malloc(size: int, ltc) -> int:
+def malloc(size: int, ltc) -> None:
     """Reserves memory. Returns starting address of the allocated block."""
 
     if ltc.hp - size <= ltc.sp:
         raise MemoryError("Heap grew into stack. Out of memory.")
     
     ltc.hp -= size
-    allocated_address = ltc.hp
-    return allocated_address
 
-def read_ltc_type_from_mem(memory, addr, type_str, t):
-    ltc_type = t.__dict__[type_str]
+def read_ltc_type_from_mem(memory, addr, type_str, ltc):
+    ltc_type = ltc.types[type_str]
     match type_str:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
             return ltc_type(int.from_bytes(memory[addr:addr + integer_type_to_size(type_str)], byteorder='little', signed=integer_type_to_signedness(type_str)))
@@ -582,12 +581,12 @@ def read_ltc_type_from_mem(memory, addr, type_str, t):
             end = addr
             while end < len(memory) and memory[end] != 0:
                 end += 1
-            return t.string(memory[addr:end].decode("utf-8"))
+            return ltc_type(memory[addr:end].decode("utf-8"))
         case "boolean":
-            return t.boolean(memory[addr] != 0)
+            return ltc_type(memory[addr] != 0)
         case "char":
-            return t.char(chr(memory[addr]))
+            return ltc_type(chr(memory[addr]))
         case "ptr":
-            return t.ptr(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
+            return ltc_type(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
         case _:
-            raise TypeError(f"Unsupported type for reading from mem: {type_str}")
+            ltc.error(ltc, f"Unsupported type for reading from mem: {type_str}")

@@ -9,7 +9,7 @@ def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
         argument_value = call_node.arguments[idx]
 
         var_addr = ltc.sp
-        ltc.sp = ltc.helper.load_to_mem(ltc, argument_value, expected_type)
+        ltc.helper.load_to_mem(ltc, argument_value, expected_type)
         ltc.namespace[len(ltc.namespace) - 1][arg_name] = {
             "type": expected_type,
             "addr": var_addr,
@@ -63,12 +63,14 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
                 tokens[i].arguments[arg_idx] = arg_val
 
             tokens[i].validate_args(ltc.user_functions)
-            arg_types, arg_names, body_source = helper._get_user_function_meta(ltc.user_functions, tokens[i].val)
+            arg_types, arg_names, body_source = helper._get_user_function_meta(ltc.user_functions, tokens[i].val, ltc)
 
             helper.create_frame(ltc)
+            ltc.traceback.append(tokens[i].val)
             _bind_user_function_args(tokens[i], arg_types, arg_names, ltc)
             local_returns = []
             local_returns = execute_source_fn(body_source, ltc, local_returns)
+            ltc.traceback.pop()
             helper.destroy_frame(ltc)
 
             if local_returns:
@@ -120,7 +122,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                     raise SyntaxError("let expects '=' as the third argument")
 
                 if type(var_value_arg) != ltc.types[var_type_arg.val]:
-                    raise TypeError(
+                    ltc.error(ltc,
                         f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"
                     )
 
@@ -303,9 +305,9 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             if not isinstance(arg, t.integer):
                 raise TypeError(f"malloc size argument must be an integer, got {type(arg).__name__}")
             
-            malloc_returns = helper.malloc(arg.val, ltc) # returns [new hp, starting address of the allocated block]
-            hp = malloc_returns[0]
-            tokens[i] = t.ptr(malloc_returns[1]) 
+            helper.malloc(arg.val, ltc)
+
+            tokens[i] = t.ptr(ltc.hp) 
         
         case "coredump":
             if len(tokens[i].args) != 0:
@@ -313,12 +315,12 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             with open("coredump.txt", "w") as f:
                 f.write("===CORE DUMP===\n")
                 f.write(f"Stack Pointer: {ltc.sp}\n===============================\n")
-                f.write(f"Heap Pointer: {hp}\n===============================\n")
+                f.write(f"Heap Pointer: {ltc.hp}\n===============================\n")
                 f.write("memory:\n")
                 for i, v in enumerate(ltc.memory):
                     if i == ltc.sp:
                         f.write(f"  [{i}]: {v}  <-- SP\n")
-                    elif i == hp:
+                    elif i == ltc.hp:
                         f.write(f"  [{i}]: {v}  <-- HP\n")
                     else:
                         f.write(f"  [{i}]: {v}\n")
@@ -357,7 +359,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                 case _:
                     raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
                     
-            ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_arg.val, type_arg.val, t) # returns the obj read from memory
+            ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_arg.val, type_arg.val, ltc) # returns the obj read from memory
 
             tokens[i] = n.at_func_return(ptr_deref, ptr_arg.val, type_size) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
 

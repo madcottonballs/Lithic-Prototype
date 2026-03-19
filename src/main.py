@@ -4,13 +4,13 @@ import noderizer as noderizer
 import typerizer as t
 import tokenizer as tokenizer
 import preproccesor
-
 class State:
     def __init__(self):
         self.memory = {}
         self.namespace: list[dict[str, any]] = [{}]
         self.types = {}
         self.stack_frames = []
+        self.traceback = []
         self.user_functions: dict[str, dict[str, object]] = {}
         self.t = t
         self.helper = helper
@@ -18,10 +18,12 @@ class State:
         self.noderizer = noderizer # alias
         self.tokenizer = tokenizer
         self.evaluator = evaluator
+        self.error    = error
         self.sp = 0
         self.hp = 0
         self.raw_source = ""
         self.line = 1
+        self.current_source = ""
         self.function_names = [
             "printf",
             "let",
@@ -56,9 +58,19 @@ class State:
             "ptr": t.ptr,
         }
 
+"""Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet."""
+def error(ltc, message):
+    """Print an error message and exit the program."""
+    print("Traceback (most recent call last):")
+    for i, v in enumerate(reversed(ltc.traceback)):
+        print(f"In {v}( ... )")
+    print(f"Line: '{ltc.current_stmt}'")
+    print(f"Lithic Error: {message}")
+    exit(1)
 
 def execute_statement(stmt: str, ltc, return_values) -> list:
     """Execute one non-control-flow statement and return return_values."""
+    ltc.current_stmt = stmt
     stmt = stmt.strip()
     if not stmt:
         return return_values
@@ -144,6 +156,7 @@ def execute_source(source, ltc: State, return_values) -> list:
     
     source_text = helper.strip_comments(source)
     source_text = preproccesor.process_imports(source_text)
+    ltc.current_source = source_text
     cursor = 0
     source_length = len(source_text)
 
