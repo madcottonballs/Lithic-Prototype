@@ -24,7 +24,11 @@ define main() {
     
     let ptr g = test();
     printf(g);
-
-    coredump();
+    
+    let string temp;
+    while (temp != "exit") {
+        temp = input("Enter 'exit' to exit: ");
+        coredump();
+    }
     return(0);
 }

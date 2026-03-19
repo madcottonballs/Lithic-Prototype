@@ -16,7 +16,7 @@ def resolve_node(node, ltc, return_values, evaluate, execute_source_fn):
         evaluate(temp, ltc, return_values, execute_source_fn)  # return_values can be ignored since we are only evaluating a single node, so there will only be one return value and it will be at index 0
         return temp[0]
     elif isinstance(node, t.var_ref):
-        node = ltc.helper.dereference_var(ltc, node)
+        node = dereference_var(ltc, node)
         return node
     return node # no operation needed, return the node as is
 
@@ -68,7 +68,6 @@ def add_string_to_memory(string, memory, ltc) -> None:
     string.inmemory = True
     string.memloc = ltc.sp
     memory[ltc.sp:ltc.sp + len(byte_rep_of_str)] = byte_rep_of_str
-    ltc.sp += len(byte_rep_of_str)
     ltc.sp += len(byte_rep_of_str)
 
 def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str) -> int:
@@ -590,3 +589,4 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
             return ltc_type(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
         case _:
             ltc.error(ltc, f"Unsupported type for reading from mem: {type_str}")
+

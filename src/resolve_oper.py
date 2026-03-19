@@ -66,31 +66,31 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             tokens[i] = resolve_type(tokens[i].node1.val / tokens[i].node2.val)
     else:
         if isinstance(tokens[i].node1, n.subexp):
-            ltc.sp, _, ltc.hp = evaluate(tokens[i].node1.val, ltc, return_values, execute_source_fn)
+            evaluate(tokens[i].node1.val, ltc, return_values, execute_source_fn)
             if len(tokens[i].node1.val) != 1:
                 raise TypeError("Sub-expression did not reduce to a single value")
             tokens[i].node1 = tokens[i].node1.val[0]
         elif isinstance(tokens[i].node1, n.oper):
             temp = [tokens[i].node1]
-            ltc.sp, _, ltc.hp = evaluate(temp, ltc, return_values, execute_source_fn)
+            evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node1 = temp[0]
         elif isinstance(tokens[i].node1, t.function):
             temp = [tokens[i].node1]
-            ltc.sp, _, ltc.hp = evaluate(temp, ltc, return_values, execute_source_fn)
+            evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node1 = temp[0]
 
         if isinstance(tokens[i].node2, n.subexp):
-            ltc.sp, _, ltc.hp = evaluate(tokens[i].node2.val, ltc, return_values, execute_source_fn)
+            evaluate(tokens[i].node2.val, ltc, return_values, execute_source_fn)
             if len(tokens[i].node2.val) != 1:
                 raise TypeError("Sub-expression did not reduce to a single value")
             tokens[i].node2 = tokens[i].node2.val[0]
         elif isinstance(tokens[i].node2, n.oper):
             temp = [tokens[i].node2]
-            ltc.sp, _, ltc.hp = evaluate(temp, ltc, return_values, execute_source_fn)
+            evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node2 = temp[0]
         elif isinstance(tokens[i].node2, t.function):
             temp = [tokens[i].node2]
-            ltc.sp, _, ltc.hp = evaluate(temp, ltc, return_values, execute_source_fn)
+            evaluate(temp, ltc, return_values, execute_source_fn)
             tokens[i].node2 = temp[0]
 
         return True
@@ -128,8 +128,7 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
     var_type = var_meta["type"]
     mem_addr = var_meta["addr"]
 
-    rhs = tokens[i].node2
-    helper.resolve_node(rhs, ltc, return_values, evaluate, execute_source_fn)
+    rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
     if var_type == "array":
         if not isinstance(rhs, t.array):
@@ -157,14 +156,12 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
 def resolve_bool_oper(ltc, tokens, i, oper: str, return_values, evaluate, execute_source_fn=None):
     t = ltc.t
     helper = ltc.helper
-    lhs = tokens[i].node1
-    helper.resolve_node(lhs, ltc, return_values, evaluate, execute_source_fn)
+    lhs = helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
 
-    rhs = tokens[i].node2
-    helper.resolve_node(rhs, ltc, return_values, evaluate, execute_source_fn)
+    rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
     if type(lhs).__name__ != type(rhs).__name__:
-        raise TypeError(f"Type mismatch in equality operator '{lhs.val} {oper} {rhs.val}'")
+        raise TypeError(f"Type mismatch in equality operator '{type(lhs).__name__}[{lhs.val}] {oper} {type(rhs).__name__}[{rhs.val}]'")
 
     match oper:
         case "==":
@@ -218,3 +215,6 @@ def resolve_memloc_oper(tokens, i, ltc):
         raise TypeError(f"Object '{rhs.val}' of type '{type(rhs).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")
 
     tokens[i] = t.ptr(rhs.memloc)
+
+
+

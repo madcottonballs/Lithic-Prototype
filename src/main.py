@@ -93,11 +93,11 @@ def evaluate_condition(condition_expr: str, ltc: State) -> bool:
 
     value = tokens[0]
     if isinstance(value, t.boolean):
-        return value.val, ltc.sp
+        return value.val
     if isinstance(value, t.i32):
-        return value.val != 0, ltc.sp
+        return value.val != 0
     if isinstance(value, t.string):
-        return len(value.val) > 0, ltc.sp
+        return len(value.val) > 0
     raise TypeError(f"Unsupported condition type: {type(value)}")
 
 def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, list[str], list[str], str, int]:
@@ -230,7 +230,7 @@ def execute_source(source, ltc: State, return_values) -> list:
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "if"):
             condition_expression, if_block_source, next_cursor = helper.parse_if_block(source_text, cursor)
-            condition_true = evaluate_condition(condition_expression, ltc.memory, ltc.namespace, ltc.types, ltc.sp, ltc.user_functions, ltc.stack_frame)
+            condition_true = evaluate_condition(condition_expression, ltc)
 
             else_cursor = helper.skip_whitespace(source_text, next_cursor)
             has_else = helper.is_controlflow_keyword_at(source_text, else_cursor, "else")
@@ -262,9 +262,9 @@ def execute_source(source, ltc: State, return_values) -> list:
             cursor += 1
 
     if ltc.hp <= ltc.sp:    # cannot check only during growth because of the pain of adding ltc.hp checks to every statement execution - easier to just check at the end of each statement execution. This also allows detection of stack/heap intersection caused by things like user-defined ltc.user_functions that manipulate the stack pointer directly.
-        raise MemoryError("Stack and Heap intersect. Out ofltc.memory.")
+        raise MemoryError("Stack and Heap intersect. Out of memory.")
 
-    return ltc.sp, return_values, ltc.hp
+    return return_values
 
 def main(raw_source: str, memory_size: int=1024) -> int:
     ltc = State()
@@ -297,4 +297,5 @@ if __name__ == "__main__":
         print("===OUTPUT===")
         return_values = main(raw_source)
     #print(return_values)
+
 

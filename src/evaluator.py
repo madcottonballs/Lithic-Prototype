@@ -122,7 +122,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                     raise SyntaxError("let expects '=' as the third argument")
 
                 if type(var_value_arg) != ltc.types[var_type_arg.val]:
-                    ltc.error(ltc,
+                    raise TypeError (
                         f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"
                     )
 
@@ -313,19 +313,46 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             if len(tokens[i].args) != 0:
                 raise SyntaxError("coredump does not take any arguments")
             with open("coredump.txt", "w") as f:
+                annontations: dict[int, str] = {} # memory annontations keyed by memory address for easier reading of the coredump. This is populated by things like variable declarations that know what memory addresses they are using, and can write those addresses along with variable names and types to the annontations dict. The coredump printing logic then checks this dict when printing each memory address, and if an annotation exists for that address, it prints it along with the memory value.
                 f.write("===CORE DUMP===\n")
+                
                 f.write(f"Stack Pointer: {ltc.sp}\n===============================\n")
                 f.write(f"Heap Pointer: {ltc.hp}\n===============================\n")
-                f.write("memory:\n")
-                for i, v in enumerate(ltc.memory):
-                    if i == ltc.sp:
-                        f.write(f"  [{i}]: {v}  <-- SP\n")
-                    elif i == ltc.hp:
-                        f.write(f"  [{i}]: {v}  <-- HP\n")
-                    else:
-                        f.write(f"  [{i}]: {v}\n")
+                annontations[ltc.sp] = "(SP)"
+                annontations[ltc.hp] = "(HP)"
+
+                f.write(f"Namespace:\n")
+                for i, v in enumerate(ltc.namespace):
+                    f.write(f"\tFrame {i}:\n")
+                    for var_name, var_meta in v.items():
+                        f.write(f"\t\t{var_name}:\n")
+                        f.write(f"\t\t\ttype: {var_meta['type']}\n")
+                        f.write(f"\t\t\taddr: {var_meta['addr']}\n")
+                        if var_meta['type'] == 'array':
+                            f.write(f"\t\t\tlength: {var_meta['length']}\n")
+                            f.write(f"\t\t\telem_type: {var_meta['elem_type']}\n")
+                        
+                        if var_meta['addr'] in annontations:                            
+                            annontations[var_meta['addr']] += f" | Start of '{var_name}' of type '{var_meta['type']}'"
+                        else:
+                            annontations[var_meta['addr']] = f"Start of '{var_name}' of type '{var_meta['type']}'"
+
                 f.write(f"===============================\n")
-                f.write(f"namespace: {ltc.namespace}\n")
+                f.write("Stack Frames:\n")
+                for i, v in enumerate(ltc.stack_frames):
+                    f.write(f"\tStack Frame {i} SP: {v}\n")
+                    if v in annontations:
+                        annontations[v] += f" | Stack frame {i} start"
+                    else:
+                        annontations[v] = f"Stack frame {i} start"
+
+                f.write(f"===============================\n")
+                f.write("Memory:\n")
+                for i, v in enumerate(ltc.memory):
+                    if i in annontations:
+                        f.write(f"\t[{i}]: {v}  <-- {annontations[i]}\n")
+                    else:
+                        f.write(f"\t[{i}]: {v}\n")
             f.close()
         
         case "exit":
