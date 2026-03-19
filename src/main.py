@@ -57,24 +57,24 @@ class State:
         }
 
 
-def execute_statement(stmt: str, ltc, return_values) -> tuple[int, list, int]:
-    """Execute one non-control-flow statement and return (updated_sp, return_values, updated_hp)."""
+def execute_statement(stmt: str, ltc, return_values) -> list:
+    """Execute one non-control-flow statement and return return_values."""
     stmt = stmt.strip()
     if not stmt:
-        return ltc.sp, return_values, ltc.hp
+        return return_values
 
     tokens = tokenizer.lexer(stmt) # fixed
     t.parser(tokens, ltc) # fixed
     noderizer.generate_trees(tokens, ltc, 0) # fixed
-    ltc.sp, return_values, ltc.hp = evaluator.evaluate(tokens, ltc, return_values, execute_source)
-    return ltc.sp, return_values, ltc.hp
+    return_values = evaluator.evaluate(tokens, ltc, return_values, execute_source)
+    return return_values
 
-def evaluate_condition(condition_expr: str, ltc: State) -> tuple[bool, int]:
-    """Evaluate condition expression; return (bool_result, updated_sp)."""
+def evaluate_condition(condition_expr: str, ltc: State) -> bool:
+    """Evaluate condition expression; return bool_result."""
     tokens = tokenizer.lexer(condition_expr)
     t.parser(tokens, ltc)
     noderizer.generate_trees(tokens, ltc, 0)
-    ltc.sp, _, _ = evaluator.evaluate(tokens, ltc, [], execute_source)
+    evaluator.evaluate(tokens, ltc, [], execute_source)
 
     if len(tokens) != 1:
         raise SyntaxError("condition must reduce to a single value")
@@ -138,9 +138,9 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
 
     return function_name, arg_types, arg_names, function_body, block_close_index + 1
 
-def execute_source(source, ltc: State, return_values) -> (int | list | int):
+def execute_source(source, ltc: State, return_values) -> list:
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
-    \n Returns (sp, return value(s) if executing a function body, hp)."""
+    \n Returns return value(s) if executing a function body"""
     
     source_text = helper.strip_comments(source)
     source_text = preproccesor.process_imports(source_text)
@@ -166,12 +166,12 @@ def execute_source(source, ltc: State, return_values) -> (int | list | int):
         if helper.is_controlflow_keyword_at(source_text, cursor, "while"):
             condition_expression, block_source, next_cursor = helper.parse_while_block(source_text, cursor)
 
-            condition_true, ltc.sp = evaluate_condition(condition_expression, ltc)
+            condition_true = evaluate_condition(condition_expression, ltc)
             while condition_true:
                 helper.create_frame(ltc)
-                ltc.sp, return_values, hp = execute_source(block_source, ltc)
-                ltc.sp = helper.destroy_frame(ltc)
-                condition_true, ltc.sp = evaluate_condition(condition_expression, ltc)
+                return_values = execute_source(block_source, ltc)
+                helper.destroy_frame(ltc)
+                condition_true = evaluate_condition(condition_expression, ltc)
 
             cursor = next_cursor
             continue
@@ -180,19 +180,19 @@ def execute_source(source, ltc: State, return_values) -> (int | list | int):
             iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor)
 
             helper.create_frame(ltc)
-            ltc.sp, return_values, hp = execute_statement(f"let i32 {iterator_name} = 0", ltc)
-            ltc.sp = helper.destroy_frame(ltc)
+            return_values = execute_statement(f"let i32 {iterator_name} = 0", ltc)
+            helper.destroy_frame(ltc)
 
-            condition_true, ltc.sp = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
+            condition_true = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
             while condition_true:
                 helper.create_frame(ltc)
-                ltc.sp, return_values, hp = execute_source(block_source, ltc.memory, ltc.namespace, ltc.types, ltc.stack_frame, ltc.sp, hp, ltc.user_functions, return_values)
-                ltc.sp, return_values, hp = execute_statement(f"{iterator_name}++", ltc.memory, ltc.namespace, ltc.types, ltc.stack_frame, ltc.sp, hp, ltc.user_functions, return_values)
-                ltc.sp = helper.destroy_frame(ltc)
-                condition_true, ltc.sp = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
+                return_values = execute_source(block_source, ltc, return_values)
+                return_values = execute_statement(f"{iterator_name}++", ltc, return_values)
+                helper.destroy_frame(ltc)
+                condition_true = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
 
-            ltc.sp, return_values, hp = execute_statement(f"{iterator_name}^", ltc)
-            ltc.sp = helper.destroy_frame(ltc)
+            return_values = execute_statement(f"{iterator_name}^", ltc)
+            helper.destroy_frame(ltc)
 
             cursor = next_cursor
             continue
@@ -201,23 +201,23 @@ def execute_source(source, ltc: State, return_values) -> (int | list | int):
             init_statement, condition_expression, step_statement, block_source, next_cursor = helper.parse_for_block(source_text, cursor)
 
             helper.create_frame(ltc)
-            ltc.sp, return_values = execute_statement(init_statement, ltc, return_values)
+            return_values = execute_statement(init_statement, ltc, return_values)
 
-            condition_true, ltc.sp = evaluate_condition(condition_expression, ltc)
+            condition_true = evaluate_condition(condition_expression, ltc)
             while condition_true:
                 helper.create_frame(ltc)
-                ltc.sp, return_values = execute_source(block_source, ltc, return_values)
-                ltc.sp, return_values = execute_statement(step_statement, ltc, return_values)
-                ltc.sp = helper.destroy_frame(ltc)
-                condition_true, ltc.sp = evaluate_condition(condition_expression, ltc)
+                return_values = execute_source(block_source, ltc, return_values)
+                return_values = execute_statement(step_statement, ltc, return_values)
+                helper.destroy_frame(ltc)
+                condition_true  = evaluate_condition(condition_expression, ltc)
 
-            ltc.sp = helper.destroy_frame(ltc)
+            helper.destroy_frame(ltc)
             cursor = next_cursor
             continue
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "if"):
             condition_expression, if_block_source, next_cursor = helper.parse_if_block(source_text, cursor)
-            condition_true, ltc.sp = evaluate_condition(condition_expression, ltc.memory, ltc.namespace, ltc.types, ltc.sp, ltc.user_functions, ltc.stack_frame)
+            condition_true = evaluate_condition(condition_expression, ltc.memory, ltc.namespace, ltc.types, ltc.sp, ltc.user_functions, ltc.stack_frame)
 
             else_cursor = helper.skip_whitespace(source_text, next_cursor)
             has_else = helper.is_controlflow_keyword_at(source_text, else_cursor, "else")
@@ -226,24 +226,24 @@ def execute_source(source, ltc: State, return_values) -> (int | list | int):
                 else_block_source, after_else_cursor = helper.parse_else_block(source_text, else_cursor)
                 if condition_true:
                     helper.create_frame(ltc)
-                    ltc.sp, return_values, hp = execute_source(if_block_source, ltc.memory, ltc.namespace, ltc.types, ltc.stack_frame, ltc.sp, hp, ltc.user_functions, return_values)
-                    ltc.sp = helper.destroy_frame(ltc)
+                    return_values = execute_source(if_block_source, ltc, return_values)
+                    helper.destroy_frame(ltc)
                 else:
                     helper.create_frame(ltc)
-                    ltc.sp, return_values, hp = execute_source(else_block_source, ltc.memory, ltc.namespace, ltc.types, ltc.stack_frame, ltc.sp, hp, ltc.user_functions, return_values)
-                    ltc.sp = helper.destroy_frame(ltc)
+                    return_values = execute_source(else_block_source, ltc, return_values)
+                    helper.destroy_frame(ltc)
                 cursor = after_else_cursor
             else:
                 if condition_true:
                     helper.create_frame(ltc)
-                    ltc.sp, return_values, hp = execute_source(if_block_source, ltc.memory, ltc.namespace, ltc.types, ltc.stack_frame, ltc.sp, hp, ltc.user_functions, return_values)
-                    ltc.sp = helper.destroy_frame(ltc)
+                    return_values = execute_source(if_block_source, ltc, return_values)
+                    helper.destroy_frame(ltc)
                 cursor = next_cursor
             continue
 
         statement_text, cursor = helper.read_statement(source_text, cursor)
         if statement_text:
-            ltc.sp, return_values, ltc.hp = execute_statement(statement_text, ltc, return_values)
+            return_values = execute_statement(statement_text, ltc, return_values)
 
         if cursor < source_length and (source_text[cursor] == ";" or source_text[cursor] == "}"):
             cursor += 1
@@ -262,7 +262,7 @@ def main(raw_source: str, memory_size: int=1024) -> int:
     ltc.hp = memory_size - 1
     ltc.user_functions = {} # maps function names to {"arg_types": [...], "arg_names": [...], "body": "..."}
     return_values = []
-    ltc.sp, return_values, ltc.hp = execute_source(ltc.raw_source, ltc, return_values)
+    return_values= execute_source(ltc.raw_source, ltc, return_values)
     if return_values == None:
         raise RuntimeError("Program did not return a value")
     return return_values[0] if len(return_values) == 1 else return_values

@@ -1,14 +1,24 @@
 """Helper functions for the interpreter, used across multiple modules. Source import is in main.py."""
-from typerizer import u64
 
-
-def create_frame(ltc):
+def create_frame(ltc) -> None:
     ltc.stack_frames.append(ltc.sp)
     ltc.namespace.append({})
-def destroy_frame(ltc) -> int:
-    sp = ltc.stack_frames.pop()
+def destroy_frame(ltc) -> None:
+    ltc.sp = ltc.stack_frames.pop()
     ltc.namespace.pop()
-    return sp
+
+def resolve_node(node, ltc, return_values, evaluate, execute_source_fn):
+    """Resolve a node that is an operand of an operator. This is used to evaluate the operands before performing the operation. It takes a node and returns the resolved object of that node."""
+    n = ltc.n
+    t = ltc.t
+    if isinstance(node, n.oper | n.mono_oper | n.subexp | t.function | t.user_function):
+        temp = [node]
+        evaluate(temp, ltc, return_values, execute_source_fn)  # return_values can be ignored since we are only evaluating a single node, so there will only be one return value and it will be at index 0
+        return temp[0]
+    elif isinstance(node, t.var_ref):
+        node = ltc.helper.dereference_var(ltc, node)
+        return node
+    return node # no operation needed, return the node as is
 
 
 # helper function for parser: finds the closing parenthesis for a given opening parenthesis index, and replaces the full "(...)" slice with one `subexp` node containing the inner tokens.
@@ -51,14 +61,14 @@ def validate_operator(tokens, i, char):
     if i + 1 >= len(tokens) or i - 1 < 0:
         raise IndexError(f"'{char}' is at the start or end of the expression")
 
-def add_string_to_memory(string, memory, sp) -> int:
+def add_string_to_memory(string, memory, ltc) -> None:
     """Returns the new stack pointer after writing the string to memory.
-    \n Ensure you write sp = add_string_to_memory(...) when calling this function, to update the stack pointer for the next write."""
+    \n sp updates handled directly on ltc object to ensure consistency across calls and avoid bugs where caller forgets to update sp after calling this helper."""
     byte_rep_of_str = string.val.encode('utf-8') + b'\x00' # null-terminated string
     string.inmemory = True
-    string.memloc = sp
-    memory[sp:sp + len(byte_rep_of_str)] = byte_rep_of_str
-    return sp + len(byte_rep_of_str)
+    string.memloc = ltc.sp
+    memory[ltc.sp:ltc.sp + len(byte_rep_of_str)] = byte_rep_of_str
+    ltc.sp += len(byte_rep_of_str)
 
 def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str) -> int:
     """Return index of the closing delimiter matching opening_index.
@@ -305,7 +315,7 @@ def read_statement(source_text: str, start_index: int) -> tuple[str, int]:
     statement_text = source_text[start_index:cursor].strip()
     return statement_text, cursor
 
-def dereference_var(ltc, var_ref_token):
+def dereference_var(ltc, var_ref_token) -> object:
     """Enter a var_ref token, recieve its obj from memory"""
     var_meta = locate_var_in_namespace(ltc.namespace, var_ref_token.val, return_just_the_check=False)[0]
     var_type: str = var_meta["type"]
@@ -392,14 +402,13 @@ def integer_type_to_signedness(type_name: str) -> bool:
         case _:
             raise ValueError(f"Unknown integer type: {type_name}")
 
-def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = None) -> int:
+def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = None) -> None:
     """Load an object into memory.
 
     - Allocation mode (memidx is None): write at stack_ptr and advance sp.
     - Overwrite mode (memidx is set): write at memidx and keep sp unchanged.
     """
-    sp = ltc.sp
-    write_ptr = sp if memidx is None else memidx
+    write_ptr = ltc.sp if memidx is None else memidx
 
     if input_type == "no type entered":
         resolved_type = type(object).__name__
@@ -411,10 +420,10 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             byte_rep_of_val = object.val.to_bytes(integer_type_to_size(resolved_type), byteorder='little', signed=integer_type_to_signedness(resolved_type))
             ltc.memory[write_ptr:write_ptr + integer_type_to_size(resolved_type)] = byte_rep_of_val
             if memidx is None:
-                sp += integer_type_to_size(resolved_type)
+                ltc.sp += integer_type_to_size(resolved_type)
         case "string":
             if memidx is None:
-                sp = add_string_to_memory(object, ltc.memory, sp)
+                ltc.sp = add_string_to_memory(object, ltc.memory, ltc)
             else:
                 byte_rep_of_str = object.val.encode('utf-8') + b'\x00'
                 ltc.memory[write_ptr:write_ptr + len(byte_rep_of_str)] = byte_rep_of_str
@@ -422,7 +431,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             byte_rep_of_val = 1 if object.val else 0
             ltc.memory[write_ptr] = byte_rep_of_val
             if memidx is None:
-                sp += 1
+                ltc.sp += 1
         case "array":
             array_ptr = write_ptr
             match object.arrayType:
@@ -432,7 +441,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                         element_ptr = array_ptr + (i * element_width)
                         load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
                     if memidx is None:
-                        sp += element_width * object.get_size()
+                        ltc.sp += element_width * object.get_size()
                 case "string":
                     raise TypeError("strings are not currently supported for arrays")
                 case "boolean":
@@ -441,21 +450,21 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                         element_ptr = array_ptr + i
                         load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
                     if memidx is None:
-                        sp += element_width * object.get_size()
+                        ltc.sp += element_width * object.get_size()
         case "char":
             byte_rep_of_char = object.val.encode('utf-8')
             ltc.memory[write_ptr] = byte_rep_of_char[0]
             if memidx is None:
-                sp += 1
+                ltc.sp += 1
         case "ptr":
             # Handle pointer type loading
             byte_rep_of_val = object.val.to_bytes(8, byteorder='little', signed=False)
             ltc.memory[write_ptr:write_ptr + 8] = byte_rep_of_val
             if memidx is None:
-                sp += 8
+                ltc.sp += 8
         case _:
             raise TypeError(f"Tried to load an unrecognized type '{resolved_type}' into memory")
-    return sp
+    return
 
 def recieve_empty_form(t, type):
     """give the name of the type you want, this function returns an empty instance of that type"""
@@ -554,16 +563,15 @@ def _get_user_function_meta(user_functions, function_name: str) -> tuple[list[st
         raise SyntaxError(f"Function '{function_name}' has mismatched arg type/name metadata")
     return arg_types, arg_names, body
 
-def malloc(size: int, heap_ptr: int, sp: int) -> tuple[int, int]:
-    """Reserves memory. Returns [new sp, starting address of the allocated block]."""
-    hp = heap_ptr # make it mutable
+def malloc(size: int, ltc) -> int:
+    """Reserves memory. Returns starting address of the allocated block."""
 
-    if hp - size <= sp:
+    if ltc.hp - size <= ltc.sp:
         raise MemoryError("Heap grew into stack. Out of memory.")
     
-    hp -= size
-    allocated_address = hp
-    return hp, allocated_address
+    ltc.hp -= size
+    allocated_address = ltc.hp
+    return allocated_address
 
 def read_ltc_type_from_mem(memory, addr, type_str, t):
     ltc_type = t.__dict__[type_str]
