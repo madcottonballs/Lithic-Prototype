@@ -2,8 +2,8 @@
 ###     [operation] [type] [inputs] -> [output]
 ###     *$[int_lit]
         Creates an integer literal.
-###     *"[str_lit]
-###     *'[char_lit]
+###     *"[str_lit]"
+###     *'[char_lit]'
 ###     *|[bool_lit]
 ###     *%[var]
         Always use when you're referencing a var.
@@ -69,3 +69,6 @@
 ```
 ###    *end #[func]
         Ends a function body.
+###    *call #[func] [any]
+        Executes a function's block.
+        All tokens following the function name are passed in as the arguments to the function.
