@@ -39,10 +39,10 @@
 ###    *printf [type] [int_lit | char_lit | string_lit | ptr ]
         Prints the 1st argument with a \n.
 
-###    *make_var [type] -> 1[var]
+###     make_var [type] -> [var]
         Initalizes a variable with that type.
 
-###    *mov [type] [value] -> [var]
+###     mov [type] [value] -> [var]
         Sets an existing variable to have that value.
         Value must have the same type as the variable.
 

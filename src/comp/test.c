@@ -1,11 +1,11 @@
-int main() {
-    int return_value;
-    ltc_main(return_value);
-    exit(return_value);
-}
+void main() {
+	int return_value;
+	return_value = main();
+	int yy;
 
-void ltc_main(int *ret) {
-    int x;
-    x = 5;
-    *ret = 0;
+}
+void ltc_main() {
+	int x;
+	x = 5;
+	return 0;
 }
