@@ -1,7 +1,7 @@
 ===CORE DUMP===
-Stack Pointer: 36
+Stack Pointer: 41
 ===============================
-Heap Pointer: 45
+Heap Pointer: 64
 ===============================
 Namespace:
 	Frame 0:
@@ -21,14 +21,18 @@ Namespace:
 		p:
 			type: ptr
 			addr: 20
-	Frame 2:
-		h:
+		g:
 			type: ptr
 			addr: 28
+		temp:
+			type: string
+			addr: 36
+		yy:
+			type: i32
+			addr: 37
 ===============================
 Stack Frames:
 	Stack Frame 0 SP: 0
-	Stack Frame 1 SP: 28
 ===============================
 Memory:
 	[0]: 6  <-- Start of 'x' of type 'i32' | Stack frame 0 start
@@ -51,7 +55,7 @@ Memory:
 	[17]: 0
 	[18]: 1  <-- Start of 'b' of type 'boolean'
 	[19]: 65  <-- Start of 'c' of type 'char'
-	[20]: 55  <-- Start of 'p' of type 'ptr'
+	[20]: 74  <-- Start of 'p' of type 'ptr'
 	[21]: 0
 	[22]: 0
 	[23]: 0
@@ -59,7 +63,7 @@ Memory:
 	[25]: 0
 	[26]: 0
 	[27]: 0
-	[28]: 45  <-- Start of 'h' of type 'ptr' | Stack frame 1 start
+	[28]: 64  <-- Start of 'g' of type 'ptr'
 	[29]: 0
 	[30]: 0
 	[31]: 0
@@ -67,16 +71,16 @@ Memory:
 	[33]: 0
 	[34]: 0
 	[35]: 0
-	[36]: 0  <-- (SP)
-	[37]: 0
+	[36]: 101  <-- Start of 'temp' of type 'string'
+	[37]: 10  <-- Start of 'yy' of type 'i32'
 	[38]: 0
 	[39]: 0
 	[40]: 0
-	[41]: 0
+	[41]: 0  <-- (SP)
 	[42]: 0
 	[43]: 0
 	[44]: 0
-	[45]: 0  <-- (HP)
+	[45]: 0
 	[46]: 0
 	[47]: 0
 	[48]: 0
@@ -86,9 +90,28 @@ Memory:
 	[52]: 0
 	[53]: 0
 	[54]: 0
-	[55]: 5
+	[55]: 0
 	[56]: 0
 	[57]: 0
 	[58]: 0
 	[59]: 0
 	[60]: 0
+	[61]: 0
+	[62]: 0
+	[63]: 0
+	[64]: 0  <-- (HP)
+	[65]: 0
+	[66]: 0
+	[67]: 0
+	[68]: 0
+	[69]: 0
+	[70]: 0
+	[71]: 0
+	[72]: 0
+	[73]: 0
+	[74]: 5
+	[75]: 0
+	[76]: 0
+	[77]: 0
+	[78]: 0
+	[79]: 0

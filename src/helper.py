@@ -464,7 +464,13 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                 ltc.sp += 8
         case _:
             ltc.error(ltc, f"Tried to load an unrecognized type '{resolved_type}' into memory")
+            
+    memory_bounds_check(ltc)
     return
+
+def memory_bounds_check(ltc) -> None:
+    if ltc.hp <= ltc.sp:
+        raise MemoryError("Stack and Heap intersect. Out of memory.")
 
 def recieve_empty_form(t, type):
     """give the name of the type you want, this function returns an empty instance of that type"""

@@ -182,7 +182,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             condition_true = evaluate_condition(condition_expression, ltc)
             while condition_true:
                 helper.create_frame(ltc)
-                return_values = execute_source(block_source, ltc)
+                return_values = execute_source(block_source, ltc, return_values)
                 helper.destroy_frame(ltc)
                 condition_true = evaluate_condition(condition_expression, ltc)
 
@@ -261,8 +261,7 @@ def execute_source(source, ltc: State, return_values) -> list:
         if cursor < source_length and (source_text[cursor] == ";" or source_text[cursor] == "}"):
             cursor += 1
 
-    if ltc.hp <= ltc.sp:    # cannot check only during growth because of the pain of adding ltc.hp checks to every statement execution - easier to just check at the end of each statement execution. This also allows detection of stack/heap intersection caused by things like user-defined ltc.user_functions that manipulate the stack pointer directly.
-        raise MemoryError("Stack and Heap intersect. Out of memory.")
+    helper.memory_bounds_check(ltc)
 
     return return_values
 
@@ -296,6 +295,3 @@ if __name__ == "__main__":
     else:
         print("===OUTPUT===")
         return_values = main(raw_source)
-    #print(return_values)
-
-

@@ -25,10 +25,13 @@ define main() {
     let ptr g = test();
     printf(g);
     
-    let string temp;
+    let string temp = "";
     while (temp != "exit") {
-        temp = input("Enter 'exit' to exit: ");
+        temp = input();
         coredump();
     }
+    let i32 yy = 10;
+    coredump();
+    printf(temp);
     return(0);
 }
