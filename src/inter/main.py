@@ -3,7 +3,7 @@ import evaluator as evaluator
 import noderizer as noderizer
 import typerizer as t
 import tokenizer as tokenizer
-import preproccesor
+import preproccesor as preproccesor
 class State:
     def __init__(self):
         self.memory = {}

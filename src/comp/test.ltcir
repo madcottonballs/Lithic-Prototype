@@ -1,0 +1,9 @@
+make_var i32 %return_value
+call #main -> %return_value
+exit %return_value
+
+define #main i32
+    make_var i32 %x
+    mov i32 $5 -> %x
+    ret $0
+end #main
