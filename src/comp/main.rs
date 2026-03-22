@@ -1,45 +1,23 @@
-use std::env;
+mod parser;
+use parser::{parser, find_functions, Token, Func};
+mod helper;
+use helper::{get_sys_args, format_param_list, resolve_includes};
 use std::fs;
-
-#[derive(Debug)]
-struct Token {
-    value: String,
-    type_: String,
-}
-impl Token {
-    fn new(value: &str, type_: &str) -> Self {
-        Token {
-            value: value.to_string(),
-            type_: type_.to_string(),
-        }
-    }
-}
-
-struct Func {
-    name: String,
-    body: String,
-    params: usize, // for simplicity, we'll assume all functions have 0 parameters for now debug
-}
-impl Func {
-    fn new(name: &str, body: &str, params: usize) -> Self {
-        Func {
-            name: name[1..name.len()].to_string(),
-            body: body.to_string(),
-            params: 0, // for simplicity, we'll assume all functions have 0 parameters for now debug
-        }
-    }
-}
 
 
 struct Compiler {
     keywords: Vec<String>,
     type_names: Vec<String>,
     target: Vec<String>,
+    using_stdlib: bool,
+    using_stdio: bool,
+    using_stdint: bool,
+    using_iostream: bool,
 }
 
 impl Compiler {
     fn new() -> Self {
-        Compiler { 
+        return Compiler { 
             keywords: vec![
                 "let".into(), 
                 "define".into(),
@@ -48,15 +26,16 @@ impl Compiler {
                 "sub".into(),
                 "mul".into(),
                 "div".into(),
-                "printf".into(),
+                "print".into(),
                 "input".into(),
-                "inlineC".into(),
+                "inlineCpp".into(),
                 "define".into(),
                 "end".into(),
                 "call".into(),
                 "mov".into(),
                 "make_var".into(),
                 "exit".into(),
+                "flush".into(),
                 ],
             type_names: vec![
                 "i32".into(),
@@ -72,67 +51,20 @@ impl Compiler {
                 "char".into(),
             ],
             target: Vec::new(),
+            using_stdlib: false,
+            using_stdio: false,
+            using_stdint: true,
+            using_iostream: false,
         }
     }
 }
 
-fn get_sys_args() -> Vec<String> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        println!("Usage: {} <source_file>", args[0]);
-        std::process::exit(1);
-    }
-    return args;
-}
 
 fn lexer(source_line: &str) -> Vec<String> {
     // Placeholder lexer implementation
     return source_line.split_whitespace().map(|s| s.to_string()).collect();  // split line into tokens based on whitespace
 }
 
-fn parser(intermediate: Vec<String>, compiler: &Compiler) -> Vec<Token> {
-    let mut tokens: Vec<Token> = intermediate
-        .into_iter()
-        .map(|value| Token::new(&value, "generic"))
-        .collect(); // convert Vec<String> to Vec<Token> with a generic type
-
-    for token in tokens.iter_mut() {
-        if token.type_ != "generic" {
-            continue;  // skip tokens that have already been classified
-        }
-        if token.value.starts_with('"') && token.value.ends_with('"') {
-            token.value = token.value.trim_matches('"').to_string();  // remove surrounding quotes
-            token.type_ = "string".to_string();
-        }
-        if token.value.starts_with("$") {
-            token.value = token.value.trim_start_matches('$').to_string();  // remove leading $
-            token.type_ = "integer".to_string();
-        }
-        if token.value.starts_with("%") {
-            token.value = token.value.trim_start_matches('%').to_string();  // remove leading %
-            token.type_ = "variable".to_string();
-        }
-        if token.value.starts_with("#") {
-            token.value = token.value.trim_start_matches('#').to_string();  // remove leading #
-            token.type_ = "function".to_string();
-        }
-        if token.value.starts_with("|") {
-            token.value = token.value.trim_start_matches('|').to_string();  // remove leading |
-            token.type_ = "boolean".to_string();
-        } 
-        if token.value == "->" {
-            token.type_ = "arrow".to_string();
-        }
-        if compiler.keywords.contains(&token.value) {
-            token.type_ = "keyword".to_string();
-        }
-        if compiler.type_names.contains(&token.value) {
-            token.type_ = "type".to_string();
-        }
-    }
-    return tokens;
-}
 
 fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
     // Placeholder compile implementation`
@@ -142,7 +74,7 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
         return compiler.target.push(target_line);
     }
     if tokens[0].type_ != "keyword".to_string() {
-        println!("Error: Line must start with a keyword");
+        println!("Error: Line must start with a keyword, instead starts with '{}'", tokens[0].value);
         std::process::exit(1);
     }
     match tokens[0].value.as_str() {
@@ -162,10 +94,16 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             } // beyond this, assume the instruction is well-formed
             let var_name = &tokens[3].value;
             let var_type = &tokens[1].value;
-            target_line = format!("\t{} {};", convert_type(var_type), var_name);  // generate C code for variable declaration
+            target_line = format!("\t{} {};", helper::convert_type(var_type), var_name);  // generate C code for variable declaration
         }
         "exit" => {
-            // Handle exit instruction
+            if tokens.len() != 2 {
+                println!("Error: 'exit' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let return_value = &tokens[1].value;
+            target_line = format!("\texit({});", return_value);  // generate C code for exit instruction
+            compiler.using_stdlib = true; // mark that we're using the standard library, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
         }
         "ret" => {
             if tokens.len() != 2 {
@@ -173,18 +111,49 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
             let return_value = &tokens[1].value;
-            target_line = format!("\treturn {};", return_value);  // generate C code for return instruction
+            target_line = format!("\t*ret = {};", return_value);  // ret* is a pointer to the return value, this is a convention we'll use for returning values from functions in C
         }
         "call" => {
-            if tokens.len() < 2 {
-                println!("Error: 'call' instruction requires at least 2 tokens, instead recieved {}", tokens.len());
+            if tokens.len() < 3 {
+                println!("Error: 'call' instruction requires at least 3 tokens, instead recieved {}", tokens.len());
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
             let func_name = &tokens[1].value;
-            let args: Vec<String> = tokens[2..tokens.len() - 2].iter().map(|t| t.value.clone()).collect();
-            let dest = &tokens[tokens.len() - 1].value;
-            target_line = format!("\t{} = {}({});", dest, func_name, args.join(", "));  // generate C code for function call
+            let mut args: Vec<String> = tokens[2..tokens.len() - 3].iter().map(|t| t.value.clone()).collect();
+            let dest: &String = &tokens[tokens.len() - 1].value;
+            args.insert(0, "&".to_string() + &dest.clone()); // add the last argument first, which is currently being treated as dest, to the args list
+            target_line = format!("\t{}({});", func_name, args.join(", "));  // generate C code for function call
         }
+        "print" => { // print [value]
+            if tokens.len() != 2 {
+                println!("Error: 'print' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let value = &tokens[1].value;
+
+            target_line = format!("\tstd::cout << {} << \"\\n\";",  value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+            compiler.using_stdio = true; // mark that we're using the standard io, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
+            compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
+        }
+        "flush" => {
+            if tokens.len() != 1 {
+                println!("Error: 'flush' instruction requires exactly 1 token, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            }
+            target_line = format!("\tstd::cout.flush();");  // generate C code for flush instruction
+            compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
+        }
+        "add" => // add [int_lit or var] [int_lit or var] -> [dest_var]
+            {
+                if tokens.len() != 5 {
+                    println!("Error: 'add' instruction requires exactly 5` tokens, instead recieved {}", tokens.len());
+                    std::process::exit(1);
+                }
+                let lhs = &tokens[1].value;
+                let rhs = &tokens[2].value;
+                let dest = &tokens[4].value;
+                target_line = format!("\t{} = {} + {};", dest, lhs, rhs);
+            }
         _ => {
             println!("Error: Unknown keyword '{}'", tokens[0].value);
             std::process::exit(1);
@@ -194,71 +163,46 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
     compiler.target.push(target_line);
 }
 
-fn convert_type(ltcir_type: &str) -> &str {
-    match ltcir_type {
-        "i32" => "int",
-        "u32" => "unsigned int",
-        "i64" => "long long",
-        "u64" => "unsigned long long",
-        "i16" => "short",
-        "u16" => "unsigned short",
-        "i8" => "char",
-        "u8" => "unsigned char",
-        "string" => "char*",
-        "boolean" => "_Bool",
-        "char" => "char",
-        _ => {
-            println!("Error: Unknown type '{}'", ltcir_type);
-            std::process::exit(1);
-        }
-    }
-}
-
-fn find_functions(source_code: &str) -> Vec<Func> {
-    let mut lineidx = 0;
-    let mut functions: Vec<Func> = Vec::new();  // this will hold the source code blocks for each function found             
-    let source_lines: Vec<String> = source_code.lines().map(|line| line.to_string()).collect();  // split source code into lines
-    
-    while lineidx < source_lines.len() {
-        let intermediate: Vec<String> = lexer(&source_lines[lineidx]); // tokenize line, this is just to check for function definitions, we won't use the tokens for anything else in this function
-        if intermediate.is_empty() {
-            lineidx += 1;
-            continue;
-        }
-        if intermediate[0] == "define".to_string() {
-            let func_name: &str = &intermediate[1];
-
-            let mut func_body = String::new();
-            lineidx += 1; // start collecting after the define line
-            while lineidx < source_lines.len() {
-                let line = &source_lines[lineidx];
-                if line.trim_start().starts_with("end") {
-                    break;
-                }
-                func_body.push_str(line);
-                func_body.push('\n'); // add line to function body, this assumes the function body is well-formed
-                lineidx += 1;
-            }
-            functions.push(Func::new(func_name, &func_body, 0));  // add function to list of functions found, for simplicity, we'll assume all functions have 0 parameters for now debug
-            // skip the "end" line if we stopped on it
-            if lineidx < source_lines.len() {
-                lineidx += 1;
-            }
-            continue;
-        }
-        lineidx += 1;
-    }
-    return functions;
-}
-
 fn compile_file(source_code: &str) -> Vec<String> {
     let mut compiler = Compiler::new();  // create a new compiler instance
 
     // find all functions in the source code, for simplicity, we'll assume that the entire source code is main() function
     let functions: Vec<Func> = find_functions(source_code);
+    let mut prototypes: Vec<String> = Vec::new();
+
+    for function in &functions {
+        let type_ = if function.name == "main" { "int" } else { "void" };
+        prototypes.push(format!(
+            "{} {}({});",
+            type_,
+            function.name,
+            format_param_list(&function.params_combined)
+        ));
+    }
+
     for function in functions {
         compile_function(&function, &mut compiler);  // compile each function and add the generated C code to the compiler's target
     }
+
+    let int_type_redefs: Vec<String> = vec![ // add typedefs for fixed-width integer types from stdint.h, this is needed because we're using custom type names like i32, u32, etc. in the source code, and we want to map them to the corresponding C types in the generated code
+        "#define i32 int32_t".to_string(),
+        "#define u32 uint32_t".to_string(),
+        "#define i64 int64_t".to_string(),
+        "#define u64 uint64_t".to_string(),
+        "#define i16 int16_t".to_string(),
+        "#define u16 uint16_t".to_string(),
+        "#define i8 int8_t".to_string(),
+        "#define u8 uint8_t".to_string(),
+    ];
+
+    compiler.target.insert(0, int_type_redefs.join("\n")); // add an empty line after the includes and before the function prototypes for readability
+    
+    let num_of_includes: usize = resolve_includes(&mut compiler); // add necessary includes at the top of the generated C code based on what features are used in the source code
+
+    for (i, proto) in prototypes.into_iter().enumerate() {
+        compiler.target.insert(num_of_includes + i, proto);
+    }
+
 
     return compiler.target;  // return the generated C code as a vector of strings, where each string is a line of C code
 }
@@ -267,7 +211,15 @@ fn compile_function(function: &Func, compiler: &mut Compiler) {
     let source_block: &str = &function.body;
     let source_lines: Vec<String> = source_block.lines().map(|line| line.to_string()).collect();  // split source code into lines
     
-    compiler.target.push(format!("void {}() {{", function.name));  // start of function definition in C
+    
+    let type_ = if function.name == "main" { "int" } else { "void" };
+    compiler.target.push(format!(
+        "{} {}({}) {{", 
+        type_,
+        function.name,
+        format_param_list(&function.params_combined)
+    ));  // start of function definition in C
+
     let mut lineidx = 0;
     while lineidx < source_lines.len() {
 
@@ -296,7 +248,7 @@ fn main() {
         std::process::exit(1);
     } // check file extension, if it's not .ltcir, print error message and exit
 
-    let all_file_name_parts_but_ext: String = if source_file_parts.len() > 1 {   source_file_parts[..source_file_parts.len() - 1].join(".")  } else {String::new()}; // get file name without extension, this will be used for output file name
+    let output_file_name: String = if source_file_parts.len() > 1 {   source_file_parts[..source_file_parts.len() - 1].join(".")  } else {String::new()}; // get file name without extension, this will be used for output file name
     
     let source_code = fs::read_to_string(source_file)
         .expect("Failed to read source file"); // read source file into a string, this will be the input to the compiler
@@ -305,7 +257,7 @@ fn main() {
     let target_code = compile_file(&source_code);
 
     // Write the generated C code to an output file with the same name but .c extension
-    let output_file_name = format!("{}.c", all_file_name_parts_but_ext);
+    let output_file_name = format!("{}.cpp", output_file_name);
     fs::write(&output_file_name, target_code.join("\n"))
         .expect("Failed to write output file");
 }

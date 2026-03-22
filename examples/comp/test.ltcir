@@ -1,11 +1,15 @@
 define #main
     make_var i32 -> %return_value
-    call #main -> %return_value
-    make_var i32 -> %yy
+    call #ltc_main -> i32 %return_value
     exit %return_value
 end #main
-define #ltc_main i32
+define #ltc_main
     make_var i32 -> %x
     mov i32 $5 -> %x
+    print 'h'
+    print x
+    add %x $1 -> %x
+    print x
+    flush
     ret $0
 end #ltc_main
