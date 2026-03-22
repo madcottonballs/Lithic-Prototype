@@ -36,6 +36,13 @@ impl Compiler {
                 "make_var".into(),
                 "exit".into(),
                 "flush".into(),
+                "equal".into(),
+                "not_equal".into(),
+                "greater".into(),
+                "less".into(),
+                "and".into(),
+                "or".into(),
+                "not".into(),
                 ],
             type_names: vec![
                 "i32".into(),
@@ -69,7 +76,7 @@ fn lexer(source_line: &str) -> Vec<String> {
 fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
     // Placeholder compile implementation`
     let mut target_line = String::new();  // this will hold the generated C code for the line
-    // For demonstration, we'll just join the token values with spaces
+
     if tokens.is_empty() {
         return compiler.target.push(target_line);
     }
@@ -105,13 +112,14 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             target_line = format!("\texit({});", return_value);  // generate C code for exit instruction
             compiler.using_stdlib = true; // mark that we're using the standard library, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
         }
-        "ret" => {
-            if tokens.len() != 2 {
-                println!("Error: 'ret' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+        "ret" => { // ret [type] [value]
+            if tokens.len() != 3 {
+                println!("Error: 'ret' instruction requires exactly 3 tokens, instead recieved {}", tokens.len());
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
-            let return_value = &tokens[1].value;
-            target_line = format!("\t*ret = {};", return_value);  // ret* is a pointer to the return value, this is a convention we'll use for returning values from functions in C
+            let return_type = &tokens[1].value; // return type is determined per return, not at definition, this is because we want to allow for different return types in the same function, this is a flexibility that C allows with void* pointers, and we'll use this flexibility in our convention for returning values from functions in C
+            let return_value = &tokens[2].value;
+            target_line = format!("\t*({}*)ret = {};", return_type, return_value);  // ret* is a pointer to the return value, this is a convention we'll use for returning values from functions in C
         }
         "call" => {
             if tokens.len() < 3 {
@@ -143,7 +151,7 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             target_line = format!("\tstd::cout.flush();");  // generate C code for flush instruction
             compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
         }
-        "add" => // add [int_lit or var] [int_lit or var] -> [dest_var]
+        "add" => // add [integer] [integer] -> [dest_var]
             {
                 if tokens.len() != 5 {
                     println!("Error: 'add' instruction requires exactly 5` tokens, instead recieved {}", tokens.len());
@@ -153,6 +161,39 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 let rhs = &tokens[2].value;
                 let dest = &tokens[4].value;
                 target_line = format!("\t{} = {} + {};", dest, lhs, rhs);
+            }
+        "sub" => // sub [integer] [integer] -> [dest_var]
+            {
+                if tokens.len() != 5 {
+                    println!("Error: 'sub' instruction requires exactly 5` tokens, instead recieved {}", tokens.len());
+                    std::process::exit(1);
+                }
+                let lhs = &tokens[1].value;
+                let rhs = &tokens[2].value;
+                let dest = &tokens[4].value;
+                target_line = format!("\t{} = {} - {};", dest, lhs, rhs);
+            }
+        "mult" => // mult [integer] [integer] -> [dest_var]
+            {
+                if tokens.len() != 5 {
+                    println!("Error: 'mult' instruction requires exactly 5` tokens, instead recieved {}", tokens.len());
+                    std::process::exit(1);
+                }
+                let lhs = &tokens[1].value;
+                let rhs = &tokens[2].value;
+                let dest = &tokens[4].value;
+                target_line = format!("\t{} = {} * {};", dest, lhs, rhs);
+            }
+        "div" => // div [integer] [integer] -> [dest_var]
+            {
+                if tokens.len() != 5 {
+                    println!("Error: 'div' instruction requires exactly 5` tokens, instead recieved {}", tokens.len());
+                    std::process::exit(1);
+                }
+                let lhs = &tokens[1].value;
+                let rhs = &tokens[2].value;
+                let dest = &tokens[4].value;
+                target_line = format!("\t{} = {} / {};", dest, lhs, rhs);
             }
         _ => {
             println!("Error: Unknown keyword '{}'", tokens[0].value);
@@ -170,20 +211,6 @@ fn compile_file(source_code: &str) -> Vec<String> {
     let functions: Vec<Func> = find_functions(source_code);
     let mut prototypes: Vec<String> = Vec::new();
 
-    for function in &functions {
-        let type_ = if function.name == "main" { "int" } else { "void" };
-        prototypes.push(format!(
-            "{} {}({});",
-            type_,
-            function.name,
-            format_param_list(&function.params_combined)
-        ));
-    }
-
-    for function in functions {
-        compile_function(&function, &mut compiler);  // compile each function and add the generated C code to the compiler's target
-    }
-
     let int_type_redefs: Vec<String> = vec![ // add typedefs for fixed-width integer types from stdint.h, this is needed because we're using custom type names like i32, u32, etc. in the source code, and we want to map them to the corresponding C types in the generated code
         "#define i32 int32_t".to_string(),
         "#define u32 uint32_t".to_string(),
@@ -194,13 +221,30 @@ fn compile_file(source_code: &str) -> Vec<String> {
         "#define i8 int8_t".to_string(),
         "#define u8 uint8_t".to_string(),
     ];
+    let int_type_redefs_len = int_type_redefs.len();
 
-    compiler.target.insert(0, int_type_redefs.join("\n")); // add an empty line after the includes and before the function prototypes for readability
-    
+    for function in &functions {
+        let type_ = if function.name == "main" { "int" } else { "void" };
+        prototypes.push(format!(
+            "{} {}({});",
+            type_,
+            function.name,
+            format_param_list(&function.params_combined)
+        )); // example output: "int main();" or "void foo(int a, int b);", this will be added to the top of the generated C code as function prototypes, this is needed for functions that are called before they are defined in the source code
+    }
+
+    for function in functions {
+        compile_function(&function, &mut compiler);  // compile each function and add the generated C code to the compiler's target
+    }
+ 
     let num_of_includes: usize = resolve_includes(&mut compiler); // add necessary includes at the top of the generated C code based on what features are used in the source code
 
+    for (i, line) in int_type_redefs.iter().cloned().enumerate() {
+        compiler.target.insert(num_of_includes + i, line);
+    }
+
     for (i, proto) in prototypes.into_iter().enumerate() {
-        compiler.target.insert(num_of_includes + i, proto);
+        compiler.target.insert(num_of_includes + int_type_redefs_len + i, proto);
     }
 
 

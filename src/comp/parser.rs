@@ -30,7 +30,7 @@ impl Func {
             .map(|t| helper::convert_type(t).to_string())
             .collect(); // convert LtcIR types to C types
         if name != "#main" { // skip paramters for entry function
-            params_c_types.insert(0, "int*".to_string()); // add a parameter for the return value, this is a convention we'll use for returning values from functions in C, the return value will be passed as a pointer to the function
+            params_c_types.insert(0, "void*".to_string()); // add a parameter for the return value, this is a convention we'll use for returning values from functions in C, the return value will be passed as a pointer to the function
         }
 
         let mut params_names: Vec<String> = if params_names.len() == 0 {

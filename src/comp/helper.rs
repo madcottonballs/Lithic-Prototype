@@ -11,7 +11,7 @@ pub fn c_type_to_formatter(ltcir_type: &str) -> &str {
         "unsigned long long" => "%llu",
         "char" => "%c",
         "char*" => "%s",
-        "_Bool" => "%d", // we'll print booleans as integers (0 or 1)
+        "bool" => "%d", // we'll print booleans as integers (0 or 1)
         _ => {
             println!("Error: Unknown C type '{}' for printf formatter", ltcir_type);
             std::process::exit(1);
@@ -49,7 +49,7 @@ pub fn convert_type(ltcir_type: &str) -> &str {
         "i8" => "i8", // use fixed-width integer types from stdint.h for 8-bit integers
         "u8" => "u8", // use fixed-width integer types from stdint.h for 8-bit integers
         "string" => "char*",
-        "boolean" => "_Bool",
+        "boolean" => "bool",
         "char" => "char",
         _ => {
             println!("Error: Unknown type '{}'", ltcir_type);
