@@ -267,10 +267,13 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         new_value.load_to_memory(ltc.memory, element_addr)
     def get_size(self):
         return len(self.val)
-    def get_byte_size(self, ltc):
+    def get_byte_size(self, ltc, index=None):
+        """Returns the byte size of the entire tuple if index is None, or the byte size of the tuple until the specified index if index is provided (useful for calculating memory offsets of tuple elements)"""
         helper = ltc.helper
         total_size = 0
-        for element in self.val:
+        for i, element in enumerate(self.val):
+            if index is not None and i >= index:
+                break
             total_size += helper.get_ltc_type_size(type(element).__name__)
         return total_size
 

@@ -41,7 +41,9 @@ class State:
             "coredump",
             "exit",
             "@",
-            "makeTuple"
+            "makeTuple",
+            "tset",
+            "tSet"
         ]
         self.types = {
             "string": t.string,

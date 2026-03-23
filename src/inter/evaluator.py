@@ -298,6 +298,41 @@ def function_processing(tokens, i, ltc, return_values) -> list:
 
             tokens[i] = t.i32(0)
 
+        case "tSet" | "tset":
+            if len(tokens[i].args) != 3:
+                raise SyntaxError("tSet expects exactly three arguments: tSet(tupleVar, index, value)")
+
+            tuple_ref = tokens[i].args[0]
+            tuple_index = tokens[i].args[1]
+            new_value = tokens[i].args[2]
+
+            if not isinstance(tuple_ref, t.var_ref):
+                raise TypeError("tSet first argument must be a tuple variable reference")
+            if not isinstance(tuple_index, t.integer):
+                raise TypeError("tSet index must be a integer")
+
+            var_data = helper.locate_var_in_namespace(ltc.namespace, tuple_ref.val, return_just_the_check=False)
+            var_meta = var_data[0]
+            if var_meta is None:
+                raise NameError(f"Variable '{tuple_ref.val}' not found")
+            if var_meta["type"] != "tuple":
+                raise TypeError("tSet first argument must reference a tuple variable")
+
+            element_types = var_meta["element_types"]
+            if tuple_index.val < 0 or tuple_index.val >= len(element_types):
+                raise SyntaxError(f"Tuple index out of range: {tuple_index.val} for length {len(element_types)}")
+
+            if type(new_value).__name__ != element_types[tuple_index.val]:
+                raise TypeError(f"tSet type mismatch: expected {element_types[tuple_index.val]}, got {type(new_value).__name__}")
+
+            base_addr = var_meta["addr"]
+
+            throwaway_obj = t.ltctuple(ltc, element_types=element_types) # we just need this to calculate the byte offset of the tuple element we want to set, since the byte offset depends on the types of the preceding tuple elements
+            elem_addr = base_addr + throwaway_obj.get_byte_size(ltc, index=tuple_index.val) 
+            helper.load_to_mem(ltc, new_value, element_types[tuple_index.val], memidx=elem_addr)
+
+            tokens[i] = t.i32(0)
+
         case "return":
             if len(tokens[i].args) != 1:
                 raise SyntaxError("return expects exactly one argument")

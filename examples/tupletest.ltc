@@ -1,6 +1,7 @@
 define main() {
     let tuple x = makeTuple(i32, i8, boolean);
-    /*x[0] = 1;*/
+    /*x[0] = 1;*/   
+    tSet(x, 0, 1);
     printf(x);
     return(0);
 }
