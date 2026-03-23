@@ -94,7 +94,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             arg = tokens[i].args[0]
             if isinstance(arg, t.integer | t.string | t.boolean | t.char):
                 print(arg.val, end="\n")
-            elif isinstance(arg, t.array):
+            elif isinstance(arg, t.array | t.ltctuple):
                 rendered = ", ".join(str(element.val) for element in arg.val)
                 print(f"[{rendered}]", end="\n")
             else:
@@ -108,6 +108,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             let_type = len(tokens[i].args)
             var_type_arg = tokens[i].args[0]
             var_name_arg = tokens[i].args[1]
+            var_value_arg = None
 
             if not isinstance(var_name_arg, t.token):
                 raise TypeError("Second argument to let must be a variable name token")
@@ -154,6 +155,21 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                     "length": var_type_arg.size,
                     "elem_type": var_type_arg.arrayType,
                 }
+            elif isinstance(var_type_arg, t.ltctuple) or (isinstance(var_type_arg, t.token) and var_type_arg.val == "tuple"):
+                tuple_element_types = None
+                if isinstance(var_type_arg, t.ltctuple):
+                    tuple_element_types = var_type_arg.element_types
+                elif isinstance(var_value_arg, t.ltctuple):
+                    tuple_element_types = var_value_arg.element_types
+
+                if tuple_element_types is None:
+                    raise TypeError("Tuple declarations require element types (use makeTuple(...) or an explicit tuple type).")
+
+                ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
+                    "type": "tuple",
+                    "addr": var_mem_addr,
+                    "element_types": tuple_element_types,
+                }
             else:
                 ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
                     "type": var_type_arg.val,
@@ -182,20 +198,12 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             match type(arg):
                 case t.string:
                     tokens[i] = t.i32(len(arg.val) + 1)
-                case t.i32 | t.u32:
-                    tokens[i] = t.i32(4)
-                case t.i64 | t.u64:
-                    tokens[i] = t.i32(8)
-                case t.i8 | t.u8:
-                    tokens[i] = t.i32(1)
-                case t.i16 | t.u16:
-                    tokens[i] = t.i32(2)
-                case t.boolean:
-                    tokens[i] = t.i32(1)
                 case t.array:
                     tokens[i] = t.i32(arg.get_size())
-                case t.char:
-                    tokens[i] = t.i32(1)
+                case t.ltctuple:
+                    tokens[i] = t.i32(arg.get_size())
+                case t.i32 | t.i64 | t.i8 | t.i16 | t.u32 | t.u64 | t.u8 | t.u16 | t.boolean | t.char | t.ptr:
+                    tokens[i] = t.i32(helper.get_ltc_type_size(type(arg).__name__))
                 case _:
                     raise TypeError(f"Unsupported argument type for sizeof: {type(arg).__name__}")
 
@@ -389,6 +397,17 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_arg.val, type_arg.val, ltc) # returns the obj read from memory
 
             tokens[i] = n.at_func_return(ptr_deref, ptr_arg.val, type_size) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
+
+        case "makeTuple":
+            if len(tokens[i].args) < 1:
+                raise SyntaxError("makeTuple expects at least one argument")
+            element_types = []
+            for arg in tokens[i].args:
+                if not isinstance(arg, t.token) or arg.val not in ltc.types:
+                    raise TypeError(f"makeTuple arguments must be type name tokens, got '{arg}'")
+                element_types.append(arg.val)
+
+            tokens[i] = t.ltctuple(ltc, elements=(), element_types=element_types)
 
     return return_values
 

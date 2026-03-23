@@ -40,7 +40,8 @@ class State:
             "malloc",
             "coredump",
             "exit",
-            "@"
+            "@",
+            "makeTuple"
         ]
         self.types = {
             "string": t.string,
@@ -56,6 +57,7 @@ class State:
             "u8": t.u8,
             "u16": t.u16,
             "ptr": t.ptr,
+            "tuple": t.ltctuple,
         }
 
 """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet."""

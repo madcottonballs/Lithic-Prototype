@@ -375,9 +375,13 @@ def dereference_var(ltc, var_ref_token) -> object:
             array_obj.inmemory = True                     # mark the array object as inmemory (used for memloc oper)
             array_obj.memloc = addr                       # store the memory address in the array object (used for memloc oper)
             return array_obj
+        case "tuple":
+            element_types = var_meta["element_types"]
+            return ltc.t.ltctuple.read_from_memory(addr, element_types, ltc) # returns the ltctuple obj
         case _:
             ltc.error(ltc, f"Unsupported variable type: {var_type}")
 
+# decremented, use get_ltc_type_size instead for all type size needs to ensure consistency and avoid bugs where integer type sizes are mismatched across different helper functions
 def integer_type_to_size(type_name: str) -> int:
     """Helper function to get the byte size of an integer type."""
     match type_name:
@@ -391,6 +395,22 @@ def integer_type_to_size(type_name: str) -> int:
             return 8
         case _:
             raise ValueError(f"Unknown integer type: {type_name}")
+
+def get_ltc_type_size(type_name: str) -> int:
+    """Helper function to get the byte size of any LTC type."""
+    match type_name:
+        case "i8"|"u8"|"char"|"boolean":
+            return 1
+        case "i16"|"u16":
+            return 2
+        case "i32"|"u32"|"ptr":
+            return 4
+        case "i64"|"u64":
+            return 8
+        case "string" | "array" | "tuple":
+            raise ValueError(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
+        case _:
+            raise ValueError(f"Unknown LTC type: {type_name}")
 
 def integer_type_to_signedness(type_name: str) -> bool:
     """Helper function to determine if an integer type is signed."""
@@ -462,6 +482,10 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             ltc.memory[write_ptr:write_ptr + 8] = byte_rep_of_val
             if memidx is None:
                 ltc.sp += 8
+        case "tuple":
+                object.load_to_memory(ltc.memory, write_ptr)
+                if memidx is None:
+                    ltc.sp += object.get_byte_size(ltc) 
         case _:
             ltc.error(ltc, f"Tried to load an unrecognized type '{resolved_type}' into memory")
             

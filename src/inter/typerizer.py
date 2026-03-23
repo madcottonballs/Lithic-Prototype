@@ -18,8 +18,11 @@ class char(ltc_type):
     def __init__(self, val):
         super().__init__(val)
         self.val = str(val).replace("\\n", "\n").replace("\\t", "\t").replace("\\\"", "\"").replace("\\\'", "\'").replace("\\\\", "\\")
+        self.size = 1
     def load_to_memory(self, memory, addr):
-        memory[addr] = self.val.to_bytes(self.size, byteorder='little', signed=False)
+        if self.val == "":
+            self.val = "\0" # treat empty char literals as null character
+        memory[addr] = ord(self.val)
     def read_from_memory(self, memory, addr):
         return chr(int.from_bytes(memory[addr], byteorder='little', signed=False))
     
@@ -28,7 +31,7 @@ class boolean(ltc_type):
         super().__init__(val)
         self.size = 1
     def load_to_memory(self, memory, addr):
-        memory[addr] = self.val.to_bytes(self.size, byteorder='little', signed=False)
+        memory[addr] = 1 if self.val else 0
     def read_from_memory(self, memory, addr):
         return bool(int.from_bytes(memory[addr], byteorder='little', signed=False))
 
@@ -212,7 +215,66 @@ class ptr(u64): # ptr (64-bit unsigned integer representing a memory address)
         super().__init__(val)
     def read_from_memory(self, memory, addr):
         return ptr(super().read_from_memory(memory, addr).val) # ptr is a wrapper around u64, so we need to extract the integer value and wrap it back in a ptr
-   
+
+class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable elements,
+    def __init__(self, ltc, elements: tuple=(), element_types: list[str]=None):
+        super().__init__(tuple(elements))
+        if element_types is not None:
+
+            self.element_types = tuple(element_types)
+
+            for _, v in enumerate(element_types):
+                self.val += (ltc.helper.recieve_empty_form(ltc.t, v),) # add empty form of each element type to the tuple
+
+        else:
+            self.element_types = tuple(type(element).__name__ for element in self.val)
+    def load_to_memory(self, memory, addr):
+        # For simplicity, we will store tuples in memory as a contiguous block of their elements' byte representations.
+        current_addr = addr # current_addr will track where we are in memory as we store each element of the tuple
+        for element in self.val:
+            if type(element).__name__ in ["i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "char", "boolean"]: # only support storing primitive types in tuples for now
+                element.load_to_memory(memory, current_addr)
+                current_addr += element.size
+            else:
+                raise TypeError(f"Unsupported tuple element type '{type(element).__name__}' for memory storage")
+        self.inmemory = True
+        self.memloc = addr
+    @staticmethod
+    def read_from_memory(addr, element_types, ltc):
+        helper = ltc.helper
+        elements = []
+        current_addr = addr
+        for element_type in element_types:
+            element = helper.read_ltc_type_from_mem(ltc.memory, current_addr, element_type, ltc)
+            current_addr += element.size
+            elements.append(element)
+        return ltctuple(ltc, elements=tuple(elements))
+    @staticmethod
+    def update_element_in_memory(ltc, tuple_addr, element_index, new_value, element_types: list[str]):
+        helper = ltc.helper
+        type_of_new_value = type(new_value).__name__
+        expected_type = element_types[element_index]
+
+        if element_index < 0 or element_index >= len(element_types):
+            raise IndexError(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
+        if type_of_new_value != expected_type:
+            raise TypeError(f"Expected new value of type '{expected_type}' for tuple element at index {element_index}, but got type '{type_of_new_value}'")
+        
+        # Calculate the memory address of the specific tuple element we want to update. This will depend on the sizes of the preceding elements in the tuple.
+        element_offset = sum(helper.get_ltc_type_size(ltc, t) for t in element_types[:element_index])
+        element_addr = tuple_addr + element_offset
+        # Write the new value to memory at the calculated address.
+        new_value.load_to_memory(ltc.memory, element_addr)
+    def get_size(self):
+        return len(self.val)
+    def get_byte_size(self, ltc):
+        helper = ltc.helper
+        total_size = 0
+        for element in self.val:
+            total_size += helper.get_ltc_type_size(type(element).__name__)
+        return total_size
+
+
 class var_ref(token):
     pass
 
