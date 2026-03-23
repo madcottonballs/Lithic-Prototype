@@ -23,6 +23,10 @@
 ###     char
 ###     boolean
 
+## Info
+*       Entry point is the #main function.
+*       To return a value from the #main function, you must use exit [any], NOT ret [type] [any]
+
 ## misc functions
 ###     add [integer] [integer] -> [var]
         Adds the first 2 args and saves in the last.
@@ -43,9 +47,8 @@
 ###     make_var [type] -> [var]
         Initalizes a variable with that type.
 
-###     mov [type] [value] -> [var]
-        Sets an existing variable to have that value.
-        Value must have the same type as the variable.
+###     mov [any] -> [var]
+        Sets an existing variable to have the value of arg 1.
 
 ###    *inlineCpp [string_lit]
         Writes the text entered into the generated C++ file.

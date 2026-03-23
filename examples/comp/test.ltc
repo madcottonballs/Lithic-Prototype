@@ -1,5 +1,7 @@
 define main() {
-    let i32 x = 5;
-    printf(x);
+    printf(ltcadd(5, 10));
     return(0);
+}
+define ltcadd(i32 a, i32 b) {
+    return(a + b);
 }

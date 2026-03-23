@@ -19,9 +19,12 @@ int main(void) {
 	exit(return_value);
 }
 void ltc_main(void* ret) {
-	bool testbool;
-	testbool = true;
-	std::cout << testbool << "\n";
+	i32 num1;
+	i32 num2;
+	num1 = 5;
+	num2 = 10;
+	ltcadd(&num1, num1, num2);
+	std::cout << num1 << "\n";
 	*(i32*)ret = 0;
 }
 void ltcadd(void* ret, i32 arg0, i32 arg1) {

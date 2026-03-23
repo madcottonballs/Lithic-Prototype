@@ -24,7 +24,7 @@ impl Compiler {
                 "ret".into(),
                 "add".into(),
                 "sub".into(),
-                "mul".into(),
+                "mult".into(),
                 "div".into(),
                 "print".into(),
                 "input".into(),
@@ -85,13 +85,13 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
         std::process::exit(1);
     }
     match tokens[0].value.as_str() {
-        "mov" => {
-            if tokens.len() != 5 {
-                println!("Error: 'mov' instruction requires exactly 5 tokens, instead recieved {}", tokens.len());
+        "mov" => { // mov [src] -> [dest]
+            if tokens.len() != 4 {
+                println!("Error: 'mov' instruction requires exactly 4 tokens, instead recieved {}", tokens.len());
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
-            let dest = &tokens[4].value;
-            let src = &tokens[2].value;
+            let dest = &tokens[3].value;
+            let src = &tokens[1].value;
             target_line = format!("\t{} = {};", dest, src);  // generate C code for mov instruction
         }
         "make_var" => {
@@ -121,13 +121,13 @@ fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             let return_value = &tokens[2].value;
             target_line = format!("\t*({}*)ret = {};", return_type, return_value);  // ret* is a pointer to the return value, this is a convention we'll use for returning values from functions in C
         }
-        "call" => {
+        "call" => { // call [function_name] [arg1] [arg2] ... -> [dest]
             if tokens.len() < 3 {
                 println!("Error: 'call' instruction requires at least 3 tokens, instead recieved {}", tokens.len());
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
             let func_name = &tokens[1].value;
-            let mut args: Vec<String> = tokens[2..tokens.len() - 3].iter().map(|t| t.value.clone()).collect();
+            let mut args: Vec<String> = tokens[2..tokens.len() - 2].iter().map(|t| t.value.clone()).collect();
             let dest: &String = &tokens[tokens.len() - 1].value;
             args.insert(0, "&".to_string() + &dest.clone()); // add the last argument first, which is currently being treated as dest, to the args list
             target_line = format!("\t{}({});", func_name, args.join(", "));  // generate C code for function call

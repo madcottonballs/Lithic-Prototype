@@ -1,13 +1,16 @@
 define #main
     make_var i32 -> %return_value
-    call #ltc_main -> i32 %return_value
+    call #ltc_main -> %return_value
     exit %return_value
 end #main
 
 define #ltc_main
-    make_var boolean -> %testbool
-    mov boolean |true -> %testbool
-    print %testbool
+    make_var i32 -> %num1
+    make_var i32 -> %num2
+    mov $5 -> %num1
+    mov $10 -> %num2
+    call #ltcadd %num1 %num2 -> %num1
+    print %num1
     ret i32 $0
 end #ltc_main
 
