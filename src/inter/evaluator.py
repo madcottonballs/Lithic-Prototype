@@ -94,9 +94,12 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             arg = tokens[i].args[0]
             if isinstance(arg, t.integer | t.string | t.boolean | t.char):
                 print(arg.val, end="\n")
-            elif isinstance(arg, t.array | t.ltctuple):
+            elif isinstance(arg, t.array):
                 rendered = ", ".join(str(element.val) for element in arg.val)
-                print(f"[{rendered}]", end="\n")
+                print(f"array[{rendered}]", end="\n")
+            elif isinstance(arg, t.ltctuple):
+                rendered = ", ".join(str(element.val) for element in arg.val)
+                print(f"tuple({rendered})", end="\n")
             else:
                 raise TypeError(f"Unsupported argument type for printf(): {type(arg).__name__}")
             tokens[i] = t.i32(0)
@@ -298,38 +301,29 @@ def function_processing(tokens, i, ltc, return_values) -> list:
 
             tokens[i] = t.i32(0)
 
-        case "tSet" | "tset":
+        case "tSet":
             if len(tokens[i].args) != 3:
                 raise SyntaxError("tSet expects exactly three arguments: tSet(tupleVar, index, value)")
 
             tuple_ref = tokens[i].args[0]
             tuple_index = tokens[i].args[1]
             new_value = tokens[i].args[2]
+            element_types = None
+            base_addr = None
 
-            if not isinstance(tuple_ref, t.var_ref):
-                raise TypeError("tSet first argument must be a tuple variable reference")
             if not isinstance(tuple_index, t.integer):
                 raise TypeError("tSet index must be a integer")
 
-            var_data = helper.locate_var_in_namespace(ltc.namespace, tuple_ref.val, return_just_the_check=False)
-            var_meta = var_data[0]
-            if var_meta is None:
-                raise NameError(f"Variable '{tuple_ref.val}' not found")
-            if var_meta["type"] != "tuple":
-                raise TypeError("tSet first argument must reference a tuple variable")
+            # sets the element_types and base_addr variables
+            if not isinstance(tuple_ref, t.ltctuple):
+                raise TypeError("tSet first argument must be a tuple reference")
 
-            element_types = var_meta["element_types"]
-            if tuple_index.val < 0 or tuple_index.val >= len(element_types):
-                raise SyntaxError(f"Tuple index out of range: {tuple_index.val} for length {len(element_types)}")
-
-            if type(new_value).__name__ != element_types[tuple_index.val]:
-                raise TypeError(f"tSet type mismatch: expected {element_types[tuple_index.val]}, got {type(new_value).__name__}")
-
-            base_addr = var_meta["addr"]
-
-            throwaway_obj = t.ltctuple(ltc, element_types=element_types) # we just need this to calculate the byte offset of the tuple element we want to set, since the byte offset depends on the types of the preceding tuple elements
-            elem_addr = base_addr + throwaway_obj.get_byte_size(ltc, index=tuple_index.val) 
-            helper.load_to_mem(ltc, new_value, element_types[tuple_index.val], memidx=elem_addr)
+            if not tuple_ref.inmemory or tuple_ref.memloc is None:
+                raise TypeError("tSet first argument must reference a tuple variable in memory")
+            
+            element_types = tuple_ref.element_types
+            base_addr = tuple_ref.memloc
+            tuple_ref.update_element_in_memory(ltc, base_addr, tuple_index.val, new_value, element_types)
 
             tokens[i] = t.i32(0)
 
@@ -443,6 +437,9 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                 element_types.append(arg.val)
 
             tokens[i] = t.ltctuple(ltc, elements=(), element_types=element_types)
+        
+        case "pass":
+            tokens[i] = t.i32(0)
 
     return return_values
 

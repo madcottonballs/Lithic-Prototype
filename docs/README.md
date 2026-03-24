@@ -339,7 +339,7 @@
 		This can be referenced later in a goto() function.
 ##	*goto([label])
 		Jumps to the labeled line of code. There is no return.
-## 	*pass()
+## 	pass
 		Does nothing.
 ##	define [func_name]([type] [arg_name]) { ... }
 		Creates a custom user function.

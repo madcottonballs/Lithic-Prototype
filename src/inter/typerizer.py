@@ -223,8 +223,9 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
 
             self.element_types = tuple(element_types)
 
-            for _, v in enumerate(element_types):
-                self.val += (ltc.helper.recieve_empty_form(ltc.t, v),) # add empty form of each element type to the tuple
+            if len(self.val) == 0:
+                for _, v in enumerate(element_types):
+                    self.val += (ltc.helper.recieve_empty_form(ltc.t, v),) # add empty form of each element type to the tuple
 
         else:
             self.element_types = tuple(type(element).__name__ for element in self.val)
@@ -248,9 +249,16 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
             element = helper.read_ltc_type_from_mem(ltc.memory, current_addr, element_type, ltc)
             current_addr += element.size
             elements.append(element)
-        return ltctuple(ltc, elements=tuple(elements))
+        return_obj = ltctuple(ltc, elements=tuple(elements))
+        return_obj.element_types = tuple(element_types)
+        return_obj.inmemory = True
+        return_obj.memloc = addr
+        return return_obj
     @staticmethod
-    def update_element_in_memory(ltc, tuple_addr, element_index, new_value, element_types: list[str]):
+    def update_element_in_memory(ltc, base_addr: int, element_index: int, new_value: ltc_type, element_types: list[str]):
+        """Updates the value of a specific element within a tuple that is stored in memory.
+        \nDOES BOUNDS CHECKING
+        \nDOES TYPE CHECKING"""
         helper = ltc.helper
         type_of_new_value = type(new_value).__name__
         expected_type = element_types[element_index]
@@ -261,10 +269,24 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
             raise TypeError(f"Expected new value of type '{expected_type}' for tuple element at index {element_index}, but got type '{type_of_new_value}'")
         
         # Calculate the memory address of the specific tuple element we want to update. This will depend on the sizes of the preceding elements in the tuple.
-        element_offset = sum(helper.get_ltc_type_size(ltc, t) for t in element_types[:element_index])
-        element_addr = tuple_addr + element_offset
+        element_offset = sum(helper.get_ltc_type_size(t) for t in element_types[:element_index])
+        element_addr = base_addr + element_offset
         # Write the new value to memory at the calculated address.
         new_value.load_to_memory(ltc.memory, element_addr)
+    @staticmethod
+    def read_element_from_memory(ltc, element_types: list[str], element_index: int, memloc: int):
+        """Reads the value of a specific element within a tuple that is stored in memory and returns it as an LTC type object.
+        \nDOES BOUNDS CHECKING"""
+        helper = ltc.helper
+
+        if element_index < 0 or element_index >= len(element_types):
+            raise IndexError(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
+        
+        # Calculate the memory address of the specific tuple element we want to read. This will depend on the sizes of the preceding elements in the tuple.
+        element_offset = sum(helper.get_ltc_type_size(t) for t in element_types[:element_index])
+        element_addr = memloc + element_offset
+        # Read the value from memory at the calculated address and return it as an LTC type object.
+        return helper.read_ltc_type_from_mem(ltc.memory, element_addr, element_types[element_index], ltc)
     def get_size(self):
         return len(self.val)
     def get_byte_size(self, ltc, index=None):
@@ -276,8 +298,7 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
                 break
             total_size += helper.get_ltc_type_size(type(element).__name__)
         return total_size
-
-
+    
 class var_ref(token):
     pass
 

@@ -42,8 +42,8 @@ class State:
             "exit",
             "@",
             "makeTuple",
-            "tset",
-            "tSet"
+            "tSet",
+            "pass"
         ]
         self.types = {
             "string": t.string,
