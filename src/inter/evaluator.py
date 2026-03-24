@@ -209,53 +209,57 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                     tokens[i] = t.i32(helper.get_ltc_type_size(type(arg).__name__))
                 case _:
                     raise TypeError(f"Unsupported argument type for sizeof: {type(arg).__name__}")
-
-        case "sConcat":
+        
+        case "concat":
             if len(tokens[i].args) < 2:
-                raise SyntaxError("sConcat expects at least two arguments")
-            concatenated = ""
+                raise SyntaxError("concat expects at least two arguments")
+            concatenated = None
+            expected_type = None
             for arg in tokens[i].args:
-                if not isinstance(arg, t.string):
-                    raise TypeError(f"Unsupported argument type for sConcat: {type(arg).__name__}")
-                concatenated += arg.val
-            tokens[i] = t.string(concatenated)
+                if expected_type is None: # set the expected type based on the first argument
+                    expected_type = type(arg)
+                if type(arg) != expected_type: # enforce that all arguments are of the same type
+                    raise TypeError(f"Argument type mismatch in concat: expected {expected_type.__name__}, got {type(arg).__name__}")
+                
+                if not isinstance(arg, expected_type):
+                    raise TypeError(f"Unsupported argument type for concat: {type(arg).__name__}")
+                
+                if isinstance(arg, t.string):
+                    if concatenated is None:
+                        concatenated = arg.val # initialize concatenated as a string if the first argument is a string
+                    else:
+                        concatenated += arg.val # concatenate strings
+                elif isinstance(arg, t.array):
+                    if concatenated is None:
+                        expected_array_type = arg.arrayType
+                        concatenated = arg.val # initialize concatenated as an array if the first argument is an array
+                    else:
+                        if arg.arrayType != expected_array_type:
+                            raise TypeError(f"Array type mismatch in concat: expected {expected_array_type}, got {arg.arrayType}")
+                        concatenated.extend(arg.val) # concatenate arrays
+                elif isinstance(arg, t.ltctuple):
+                    if concatenated is None:
+                        concatenated = arg.val # initialize concatenated as a tuple if the first argument is a tuple
+                        concatenated_types = arg.element_types
+                    else:
+                        concatenated += (arg.val) # concatenate tuples
+                        concatenated_types += (arg.element_types)
+            
+            if expected_type == t.ltctuple:
+                tokens[i] = t.ltctuple(ltc, elements=tuple(concatenated), element_types=concatenated_types)
+            elif expected_type == t.array:
+                tokens[i] = t.array(concatenated, arrayType=arg.arrayType, parse=False)
+            else: # strings & arrays
+                tokens[i] = expected_type(concatenated)
 
-        case "sLength":
+        case "length":
             if len(tokens[i].args) != 1:
-                raise SyntaxError("sLength() expects exactly one argument")
+                raise SyntaxError("length() expects exactly one argument")
             arg = tokens[i].args[0]
-            if not isinstance(arg, t.string):
-                raise TypeError(f"Unsupported argument type for sLength(): {type(arg).__name__}")
-            tokens[i] = t.i32(len(arg.val))
-
-        case "aConcat":
-            if len(tokens[i].args) < 2:
-                raise SyntaxError("aConcat expects at least two arguments")
-
-            expected_array_type = tokens[i].args[0].arrayType
-            concatenated = []
-
-            for arg in tokens[i].args:
-                if not isinstance(arg, t.array):
-                    raise TypeError(
-                        f"Unsupported argument type for aConcat: '{type(arg).__name__}'. "
-                        "Array concatenation only supports array arguments."
-                    )
-                if arg.arrayType != expected_array_type:
-                    raise TypeError(
-                        f"Array type mismatch in aConcat: expected {expected_array_type}[], got {arg.arrayType}[]"
-                    )
-                concatenated.extend(arg.val)
-
-            tokens[i] = t.array(concatenated, arrayType=expected_array_type, parse=False)
-
-        case "aLength":
-            if len(tokens[i].args) != 1:
-                raise SyntaxError("aLength() expects exactly one argument")
-            arg = tokens[i].args[0]
-            if not isinstance(arg, t.array):
-                raise TypeError(f"aLength() only takes arrays, not '{type(arg).__name__}'")
-            tokens[i] = t.i32(arg.get_size())
+            if isinstance(arg, t.string | t.array):
+                tokens[i] = t.i32(len(arg.val))
+            elif isinstance(arg, t.ltctuple):
+                tokens[i] = t.i32(arg.get_size())
 
         case "aSet":
             if len(tokens[i].args) != 3:
@@ -378,6 +382,8 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                         if var_meta['type'] == 'array':
                             f.write(f"\t\t\tlength: {var_meta['length']}\n")
                             f.write(f"\t\t\telem_type: {var_meta['elem_type']}\n")
+                        if var_meta['type'] == 'tuple':
+                            f.write(f"\t\t\telem_types: {var_meta['element_types']}\n")
                         
                         if var_meta['addr'] in annontations:                            
                             annontations[var_meta['addr']] += f" | Start of '{var_name}' of type '{var_meta['type']}'"

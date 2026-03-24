@@ -30,10 +30,6 @@ class State:
             "input",
             "typeof",
             "sizeof",
-            "sConcat",
-            "sLength",
-            "aLength",
-            "aConcat",
             "aSet",
             "return",
             "cast",
@@ -43,7 +39,9 @@ class State:
             "@",
             "makeTuple",
             "tSet",
-            "pass"
+            "pass",
+            "concat",
+            "length"
         ]
         self.types = {
             "string": t.string,

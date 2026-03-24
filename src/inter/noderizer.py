@@ -86,7 +86,6 @@ def generate_trees(tokens, ltc, start_index=0):
 
 def _build_indexing(start_index, tokens, ltc):
     t = ltc.t
-    helper = ltc.helper
     index = start_index
     while index < len(tokens):
 
@@ -206,6 +205,26 @@ def build_array_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
     ]
 
     return t.function("aSet", args)
+
+def build_tuple_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
+    t = ltc.t
+    """Build tSet(tupleRef, index, rhs) function node and replace current statement."""
+    if not isinstance(lhs_ref, t.var_ref):
+        raise TypeError("Indexed assignment requires a variable reference as the tuple base")
+    if not isinstance(lhs_index_array, t.array) or lhs_index_array.get_size() != 1:
+        raise SyntaxError("Indexed assignment expects exactly one index: tup[idx]")
+
+    index_token = _resolve_index_token_to_dword(lhs_index_array.val[0], ltc)
+    args = [
+        lhs_ref,
+        t.token(","),
+        index_token,
+        t.token(","),   
+        rhs_value,
+    ]
+
+    return t.function("tSet", args)
+
 
 def _build_string_indexing(current_token, next_token, tokens, index, ltc):
     t = ltc.t

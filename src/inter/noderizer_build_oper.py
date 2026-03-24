@@ -51,11 +51,17 @@ def build_assign_oper(tokens, index, ltc):
     if len(rhs_tokens) != 1:
         raise SyntaxError("right hand side during assignment did not reduce to a single value")
 
-    # Indexed write rewrite: x[i] = rhs  ->  aSet(x, i, rhs)
-    if index >= 2 and isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
-        set_call = n.build_array_set_call(tokens[index - 2], tokens[index - 1], rhs_tokens[0], ltc)
-        tokens[index - 2:] = [set_call]
-        return
+    if index >= 2:
+        # Indexed write rewrite: x [i] = rhs  ->  aSet(...) or tSet(...)
+        if isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
+            var_meta = ltc.helper.locate_var_in_namespace(ltc.namespace, tokens[index - 2].val, return_just_the_check=False)[0]
+            if var_meta and var_meta.get("type") == "tuple":
+                set_call = n.build_tuple_set_call(tokens[index - 2], tokens[index - 1], rhs_tokens[0], ltc)
+            else:
+                set_call = n.build_array_set_call(tokens[index - 2], tokens[index - 1], rhs_tokens[0], ltc)
+            tokens[index - 2:] = [set_call]
+            return
+
 
     assign_node = n.assign(tokens[index - 1], rhs_tokens[0])
     tokens[index - 1:] = [assign_node]

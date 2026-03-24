@@ -148,42 +148,51 @@
 				}
 ```		
 ##	Data:
-###	Strings:
-####		sLength([string])
-			Returns (as a i32) the number of characters in the string.
-			Ex: 
->				let i32 x = sLength("hello world");
-####		sConcat([string], [string])
-			All arguments must be strings.
-			Must be >= 2 arguments.
-			All arguments are joined together and return a single string.
-			Ex:
->				sConcat("hello ", "world ", "it's a lovely day!")	/* This would return the string "hello world it's a lovely day!" */
-### Arrays
-####		aConcat([array], [array])
-			All arguments must be arrays.
-			Must be >= 2 arguments.
-			All arrays passed in must be of the same type (ex.: i32[])
-			All arguments are joined together and return a single array.
-			Ex:
-> 				aConcat([3, 2], [9, 21, 4], [2, 9]) 		/* This would return the array [3, 2, 9, 21, 4, 2, 9]. */
-####		aLength([array])
-			Returns the number (i32) of elements in the array passed in.
-####		aSet([array], [integer], [any])
+###		aSet([array], [integer], [any])
 			Indexed array element reassignment.
 			The first argument is a reference to a array.
 			The second argument is the index of where the new value must replace existing data.
 			The third argument is the new object replacing the old. 
 * Tuples
-### Tuples
-####		tSet([tuple], [integer], [any])
+###		tSet([tuple], [integer], [any])
 			Indexed tuple element reassignment.
 			The first argument is a reference to a tuple.
 			The second argument is the index of where the new value must replace existing data.
 			The third argument is the new object replacing the old. 
 			The new object must have the same type as the element in the tuple.
-### Misc
-####		let [type] [var_ref] = [value]
+###		concat([array | tuple | string], [array | tuple | string])
+			Unified concat() function. 
+			Arrays:
+			All arguments must be arrays.
+			Must be >= 2 arguments.
+			All arrays passed in must be of the same type (ex.: i32[])
+			All arguments are joined together and return a single array.
+			Ex:
+> 				concat([3, 2], [9, 21, 4], [2, 9]) 		/* This would return the array [3, 2, 9, 21, 4, 2, 9]. */
+			Strings:
+			All arguments must be strings.
+			Must be >= 2 arguments.
+			All arguments are joined together and return a single string.
+			Ex:
+>				concat("hello ", "world ", "it's a lovely day!")	/* This would return the string "hello world it's a lovely day!" */
+			Tuples:
+			All arguments must be tuples.
+			Must be >= 2 arguments.
+			All tuples are joined together and return a single tuple.
+			Ex:
+>				concat(makeTuple(i32, i32), makeTuple(u8))	/* This would return the tuple (i32, i32, u8) */
+###		length(array | tuple | string):
+			Unified length() function.
+			Strings:
+			Returns (as a i32) the number of characters in the string.
+			Ex: 
+>				let i32 x = sLength("hello world");
+			Tuples:
+			Returns the number (i32) of elements in the tuple passed in.
+			Arrays:
+			Returns the number (i32) of elements in the array passed in.
+
+###		let [type] [var_ref] = [value]
 			Creates a new variable of the type specified in argument 1 with the name specified in argument 2.
 			Optionally assigns it a value with argument 3.
 			To only initalize without assignment, do not include "= [value]".
@@ -192,16 +201,16 @@
 				let i32 x = 5;
 				let i32[3] y = [5, 2, 9];
 ```
-####		typeof([any])
+###		typeof([any])
 			You can enter anything into this function.
 			Some things may work, some may not.
 			Will return the type of the data types as a string.
 		
-####		sizeof([i32 | char | string | boolean])
+###		sizeof([any])
 			Will return the byte size of each data type as a i32.
 			Ex:
 >			sizeof(5)	/* This example would return 4, because dwords have a byte size of 4. */
-####		cast([any], [type])
+###		cast([any], [type])
 			Equivalent to the cast operator.
 			Cast function converts the first obj into the type referenced.
 			Ex: 
@@ -262,7 +271,7 @@
 					All characters in the string must be a digit.
 					For example, the string "273" can turn to a u64 (and so can be a ptr), but the string "hello" cannot turn to a ptr type.
 
-#### 	malloc([i32])
+### 	malloc([i32])
 			Reserves a block of memory in the stack for the programmer to use.
 			The size of this new memory is determined by the argument passed in.
 			Returns a ptr to the first byte of this block.
@@ -271,7 +280,7 @@
 >				let ptr x = malloc(5);
 			This reserves 5 bytes for the programmer to use, x is a ptr to the first byte.
 
-####		coredump()
+###		coredump()
 			In interprter version, currently prints the sp and virtual memory contents.
 			Will eventually dump to a *file in both versions.
 
