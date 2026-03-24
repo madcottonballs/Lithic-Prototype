@@ -274,7 +274,7 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         # Write the new value to memory at the calculated address.
         new_value.load_to_memory(ltc.memory, element_addr)
     @staticmethod
-    def read_element_from_memory(ltc, element_types: list[str], element_index: int, memloc: int):
+    def read_element_from_memory(ltc, element_types: list[str], element_index: int, memloc: int) -> ltc_type:
         """Reads the value of a specific element within a tuple that is stored in memory and returns it as an LTC type object.
         \nDOES BOUNDS CHECKING"""
         helper = ltc.helper

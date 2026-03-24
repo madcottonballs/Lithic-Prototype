@@ -4,7 +4,11 @@ define main() {
     tSet(x, 0, 50);
     tSet(x, 1, 127 -> i8);
     tSet(x, 2, true);
-    printf(x);
+    iterate (i, 3) {
+        printf(x[i]);
+    }
+    printf(x[-1])
+
     coredump(); 
     
     

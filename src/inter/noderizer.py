@@ -95,35 +95,37 @@ def _build_indexing(start_index, tokens, ltc):
         
         current_token = tokens[index]
         next_token = tokens[index + 1]
-        if type(current_token).__name__ == "array":
-            if type(next_token).__name__ == "array" and next_token.get_size() == 1: # condition of ex. [5, 3, 2][0] -> should return 5
-                _build_array_indexing(current_token, next_token, tokens, index, ltc)
-        if type(current_token).__name__ == "string":
-            if type(next_token).__name__ == "array" and next_token.get_size() == 1: # condition of ex. "hello"[0] -> should return 'h'
-                _build_string_indexing(current_token, next_token, tokens, index, ltc)
-
+        type_of_current_token = type(current_token).__name__
+        type_of_next_token = type(next_token).__name__
+        match type_of_current_token:
+            case "array":
+                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. [5, 3, 2][0] -> should return 5
+                    _build_array_indexing(current_token, next_token, tokens, index, ltc)
+            case "string":
+                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. "hello"[0] -> should return 'h'
+                    _build_string_indexing(current_token, next_token, tokens, index, ltc)
+            case "ltctuple":
+                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. (5, 3, 2)[0] -> should return 5
+                    _build_tuple_indexing(current_token, next_token, tokens, index, ltc)
         index += 1
 
 def _build_array_indexing(current_token, next_token, tokens, index, ltc):
     t = ltc.t
-    helper = ltc.helper
     index_value_token = next_token.val[0]
-    if isinstance(index_value_token, t.var_ref):
-        index_value_token = helper.dereference_var(ltc, index_value_token)
-    elif isinstance(index_value_token, t.token):
-        # Handle unresolved plain tokens defensively.
-        if helper.locate_var_in_namespace(ltc.namespace, index_value_token.val, return_just_the_check=True):
-            index_value_token = helper.dereference_var(ltc, t.var_ref(index_value_token.val))
-        elif str(index_value_token.val).isdigit():
-            index_value_token = t.i32(index_value_token.val)
+    array_length = current_token.get_size()
+
+    # resolve index token, which can be a var_ref or an unresolved token that might be a var_ref or an integer literal
+    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
 
     if not isinstance(index_value_token, t.integer):
         raise TypeError(f"Tried to index an array with a non-integer index of type '{type(index_value_token).__name__}'. This error is usually thrown when you try indexing with an undeclared variable. (did you miss a ';' before this statement?)")
     
     array_index = index_value_token.val
 
-    if array_index < 0 or array_index >= current_token.get_size():
-        raise SyntaxError(f"Tried to index an array of size {current_token.get_size()} with an index of {array_index}")
+    if array_index < 0:
+        array_index = array_index % array_length # support negative indexing for arrays ("%" because index is negative)
+    if array_index >= array_length:
+        raise SyntaxError(f"Tried to index an array of size {array_length} with an index of {array_index}")
         
     match current_token.arrayType:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
@@ -139,8 +141,37 @@ def _build_array_indexing(current_token, next_token, tokens, index, ltc):
         case _:
             raise TypeError("Unsupported type of array used for array indexing")
 
+def _build_tuple_indexing(current_token, next_token, tokens, index, ltc):
+    t = ltc.t
+    tuple_length = current_token.get_size()
+
+    index_value_token = next_token.val[0] if len(next_token.val) > 0 else None
+    if index_value_token is None:
+        raise SyntaxError("Expected an index inside the brackets for tuple indexing, e.g. (5, 3)[0]")
+
+    # resolve index token, which can be a var_ref or an unresolved token that might be a var_ref or an integer literal
+    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
+
+    if not isinstance(index_value_token, t.integer):
+        raise TypeError(f"Tried to index an array with a non-integer index of type '{type(index_value_token).__name__}'. This error is usually thrown when you try indexing with an undeclared variable. (did you miss a ';' before this statement?)")
+    
+    tuple_index = index_value_token.val
+
+    if tuple_index < 0:
+        tuple_index = tuple_index % tuple_length # support negative indexing for tuples ("%" because index is negative)
+    if tuple_index >= tuple_length:
+        raise SyntaxError(f"Tried to index a tuple of size {tuple_length} with an index of {tuple_index}")
+    
+    if not isinstance(current_token, t.ltctuple):
+        raise TypeError("Tried to index a non-tuple value as if it were a tuple")
+
+    element_types = current_token.element_types
+
+    new_obj = t.ltctuple.read_element_from_memory(ltc, element_types, tuple_index, current_token.memloc)
+    tokens[index:index + 2] = [new_obj] # tokens: [tuple] [array (index)] -> [element at index]
+        
 def _resolve_index_token_to_dword(index_token, ltc):
-    """Resolve index token to i32 for indexed write rewrites."""
+    """Resolve index token to i32 for indexed operations."""
     t = ltc.t
     helper = ltc.helper    
     resolved_index = index_token
@@ -153,7 +184,7 @@ def _resolve_index_token_to_dword(index_token, ltc):
             resolved_index = t.i32(resolved_index.val)
 
     if not isinstance(resolved_index, t.integer):
-        raise TypeError("Array index must resolve to an integer")
+        raise TypeError("Index must resolve to an integer")
 
     return resolved_index
 
@@ -178,27 +209,19 @@ def build_array_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
 
 def _build_string_indexing(current_token, next_token, tokens, index, ltc):
     t = ltc.t
-    helper = ltc.helper
 
     index_value_token = next_token.val[0]
-    if isinstance(index_value_token, t.var_ref):
-        index_value_token = helper.dereference_var(ltc, index_value_token)
-    elif isinstance(index_value_token, t.token):
-        # Handle unresolved plain tokens defensively.
-        if helper.locate_var_in_namespace(ltc.namespace, index_value_token.val, return_just_the_check=True):
-            index_value_token = helper.dereference_var(ltc, t.var_ref(index_value_token.val))
-        elif str(index_value_token.val).isdigit():
-            index_value_token = t.i32(index_value_token.val)
+    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
 
     if not isinstance(index_value_token, t.integer):
         raise TypeError("Can only use an integer as an index for an array (did you miss a ';' before this statement?)")
     
-    array_index = index_value_token.val
+    string_index = index_value_token.val
 
-    if array_index < 0 or array_index >= len(current_token.val):
-        raise SyntaxError(f"Tried to index a string of size {len(current_token.val)} with an index of {array_index}")
+    if string_index < 0 or string_index >= len(current_token.val):
+        raise SyntaxError(f"Tried to index a string of size {len(current_token.val)} with an index of {string_index}")
     
-    element = current_token.val[array_index]
+    element = current_token.val[string_index]
     tokens[index:index + 2] = [t.char(element.val if hasattr(element, "val") else element)]
 
 def _build_let_stmts(start_index, tokens, ltc):

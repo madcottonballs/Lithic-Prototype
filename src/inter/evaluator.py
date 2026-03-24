@@ -267,8 +267,11 @@ def function_processing(tokens, i, ltc, return_values) -> list:
 
             if not isinstance(array_ref, t.var_ref):
                 raise TypeError("aSet first argument must be an array variable reference")
-            if not isinstance(array_index, t.i32):
-                raise TypeError("aSet index must be a i32")
+            if not isinstance(array_index, t.integer):
+                raise TypeError("aSet index must be a integer")
+            
+            if array_index.val < 0:
+                raise SyntaxError("aSet index cannot be negative")
 
             var_data = helper.locate_var_in_namespace(ltc.namespace, array_ref.val, return_just_the_check=False)
             var_meta = var_data[0]
@@ -279,7 +282,10 @@ def function_processing(tokens, i, ltc, return_values) -> list:
 
             elem_type = var_meta["elem_type"]
             array_len = var_meta["length"]
-            if array_index.val < 0 or array_index.val >= array_len:
+            if array_index.val < 0:
+                array_index.val = array_index.val % array_len
+
+            if array_index.val >= array_len:
                 raise SyntaxError(f"Array index out of range: {array_index.val} for length {array_len}")
 
             if type(new_value).__name__ != elem_type:
@@ -322,6 +328,10 @@ def function_processing(tokens, i, ltc, return_values) -> list:
                 raise TypeError("tSet first argument must reference a tuple variable in memory")
             
             element_types = tuple_ref.element_types
+
+            if tuple_index.val < 0: # example: (4, 2, 9)[-1] -> 9
+                tuple_index.val = tuple_index.val % len(element_types)  # support negative indexing for tuples
+            
             base_addr = tuple_ref.memloc
             tuple_ref.update_element_in_memory(ltc, base_addr, tuple_index.val, new_value, element_types)
 

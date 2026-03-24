@@ -197,8 +197,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor)
 
             helper.create_frame(ltc)
-            return_values = execute_statement(f"let i32 {iterator_name} = 0", ltc)
-            helper.destroy_frame(ltc)
+            return_values = execute_statement(f"let i32 {iterator_name} = 0", ltc, return_values)
 
             condition_true = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
             while condition_true:
@@ -208,7 +207,7 @@ def execute_source(source, ltc: State, return_values) -> list:
                 helper.destroy_frame(ltc)
                 condition_true = evaluate_condition(f"{iterator_name} < {end_value}", ltc)
 
-            return_values = execute_statement(f"{iterator_name}^", ltc)
+            return_values = execute_statement(f"{iterator_name}^", ltc, return_values) # destroy iterator variable
             helper.destroy_frame(ltc)
 
             cursor = next_cursor
