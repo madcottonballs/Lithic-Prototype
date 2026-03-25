@@ -56,7 +56,7 @@
 			"patterns": [
 				{
 					"name": "support.type",
-					"match": "\\b(f64|i8|u8|i16|u16|i32|u32|i64|u64|ptr|array|label|char|boolean|string)\\b"
+					"match": "\\b(f64|i8|u8|i16|u16|i32|u32|i64|u64|ptr|array|label|char|boolean|string|tuple)\\b"
 				}
 			]
 		},
