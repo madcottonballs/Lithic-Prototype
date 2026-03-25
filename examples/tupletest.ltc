@@ -1,4 +1,5 @@
 define customAdd(i32 x, i32 y) {
+    let i64 temp = 500 -> i64; /* move ptr for test */
     let tuple result = makeTuple(i32, ptr);
     result[0] = x + y;
     result[1] = &result[0];

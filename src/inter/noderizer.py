@@ -1,5 +1,4 @@
 """This module builds operator nodes for expressions, such as addition, subtraction, equality checks, etc. It also handles parsing of array type declarations and literals, as well as variable dereferencing."""
-from typerizer import integer
 from noderizer_build_oper import *
 
 class oper():
@@ -46,6 +45,8 @@ class add(oper):
     pass
 class sub(oper):
     pass
+class index_oper(oper):
+    pass
 class subexp():
     # Parenthesized sub-expression node, containing a nested token list/tree.
     def __init__(self, val: list):
@@ -85,7 +86,6 @@ def generate_trees(tokens, ltc, start_index=0):
     _build_indexing(start_index, tokens, ltc)
 
 def _build_indexing(start_index, tokens, ltc):
-    t = ltc.t
     index = start_index
     while index < len(tokens):
 
@@ -97,77 +97,29 @@ def _build_indexing(start_index, tokens, ltc):
         type_of_current_token = type(current_token).__name__
         type_of_next_token = type(next_token).__name__
         match type_of_current_token:
+            case "memloc":
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    index_token = next_token.val[0]
+                    current_token.node = index_oper(current_token.node, index_token)
+                    tokens[index:index + 2] = [current_token]
             case "array":
-                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. [5, 3, 2][0] -> should return 5
-                    _build_array_indexing(current_token, next_token, tokens, index, ltc)
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    _build_index_node(current_token, next_token, tokens, index, ltc)
             case "string":
-                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. "hello"[0] -> should return 'h'
-                    _build_string_indexing(current_token, next_token, tokens, index, ltc)
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    _build_index_node(current_token, next_token, tokens, index, ltc)
             case "ltctuple":
-                if type_of_next_token == "array" and next_token.get_size() == 1: # condition of ex. (5, 3, 2)[0] -> should return 5
-                    _build_tuple_indexing(current_token, next_token, tokens, index, ltc)
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    _build_index_node(current_token, next_token, tokens, index, ltc)
         index += 1
 
-def _build_array_indexing(current_token, next_token, tokens, index, ltc):
+def _build_index_node(current_token, next_token, tokens, index, ltc):
     t = ltc.t
-    index_value_token = next_token.val[0]
-    array_length = current_token.get_size()
+    if not isinstance(next_token, t.array) or next_token.get_size() != 1:
+        raise SyntaxError("Indexed access expects exactly one index: obj[idx]")
+    index_token = next_token.val[0]
+    tokens[index:index + 2] = [index_oper(current_token, index_token)]
 
-    # resolve index token, which can be a var_ref or an unresolved token that might be a var_ref or an integer literal
-    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
-
-    if not isinstance(index_value_token, t.integer):
-        raise TypeError(f"Tried to index an array with a non-integer index of type '{type(index_value_token).__name__}'. This error is usually thrown when you try indexing with an undeclared variable. (did you miss a ';' before this statement?)")
-    
-    array_index = index_value_token.val
-
-    if array_index < 0:
-        array_index = array_index % array_length # support negative indexing for arrays ("%" because index is negative)
-    if array_index >= array_length:
-        raise SyntaxError(f"Tried to index an array of size {array_length} with an index of {array_index}")
-        
-    match current_token.arrayType:
-        case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            temp = t.__dict__[current_token.arrayType] # get the correct integer type constructor based on arrayType
-            element = current_token.val[array_index]
-            tokens[index:index + 2] = [temp(element.val if hasattr(element, "val") else element)]
-        case "string":
-            element = current_token.val[array_index]
-            tokens[index:index + 2] = [t.string(element.val if hasattr(element, "val") else element)]
-        case "boolean":
-            element = current_token.val[array_index]
-            tokens[index:index + 2] = [t.boolean(element.val if hasattr(element, "val") else element)]
-        case _:
-            raise TypeError("Unsupported type of array used for array indexing")
-
-def _build_tuple_indexing(current_token, next_token, tokens, index, ltc):
-    t = ltc.t
-    tuple_length = current_token.get_size()
-
-    index_value_token = next_token.val[0] if len(next_token.val) > 0 else None
-    if index_value_token is None:
-        raise SyntaxError("Expected an index inside the brackets for tuple indexing, e.g. (5, 3)[0]")
-
-    # resolve index token, which can be a var_ref or an unresolved token that might be a var_ref or an integer literal
-    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
-
-    if not isinstance(index_value_token, t.integer):
-        raise TypeError(f"Tried to index an array with a non-integer index of type '{type(index_value_token).__name__}'. This error is usually thrown when you try indexing with an undeclared variable. (did you miss a ';' before this statement?)")
-    
-    tuple_index = index_value_token.val
-
-    if tuple_index < 0:
-        tuple_index = tuple_index % tuple_length # support negative indexing for tuples ("%" because index is negative)
-    if tuple_index >= tuple_length:
-        raise SyntaxError(f"Tried to index a tuple of size {tuple_length} with an index of {tuple_index}")
-    
-    if not isinstance(current_token, t.ltctuple):
-        raise TypeError("Tried to index a non-tuple value as if it were a tuple")
-
-    element_types = current_token.element_types
-
-    new_obj = t.ltctuple.read_element_from_memory(ltc, element_types, tuple_index, current_token.memloc)
-    tokens[index:index + 2] = [new_obj] # tokens: [tuple] [array (index)] -> [element at index]
         
 def _resolve_index_token_to_dword(index_token, ltc):
     """Resolve index token to i32 for indexed operations."""
@@ -187,15 +139,12 @@ def _resolve_index_token_to_dword(index_token, ltc):
 
     return resolved_index
 
-def build_array_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
+def build_array_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     t = ltc.t
     """Build aSet(arrayRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
         raise TypeError("Indexed assignment requires a variable reference as the array base")
-    if not isinstance(lhs_index_array, t.array) or lhs_index_array.get_size() != 1:
-        raise SyntaxError("Indexed assignment expects exactly one index: arr[idx]")
-
-    index_token = _resolve_index_token_to_dword(lhs_index_array.val[0], ltc)
+    index_token = _resolve_index_token_to_dword(lhs_index_token, ltc)
     args = [
         lhs_ref,
         t.token(","),
@@ -206,15 +155,12 @@ def build_array_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
 
     return t.function("aSet", args)
 
-def build_tuple_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
+def build_tuple_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     t = ltc.t
     """Build tSet(tupleRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
         raise TypeError("Indexed assignment requires a variable reference as the tuple base")
-    if not isinstance(lhs_index_array, t.array) or lhs_index_array.get_size() != 1:
-        raise SyntaxError("Indexed assignment expects exactly one index: tup[idx]")
-
-    index_token = _resolve_index_token_to_dword(lhs_index_array.val[0], ltc)
+    index_token = _resolve_index_token_to_dword(lhs_index_token, ltc)
     args = [
         lhs_ref,
         t.token(","),
@@ -225,23 +171,6 @@ def build_tuple_set_call(lhs_ref, lhs_index_array, rhs_value, ltc):
 
     return t.function("tSet", args)
 
-
-def _build_string_indexing(current_token, next_token, tokens, index, ltc):
-    t = ltc.t
-
-    index_value_token = next_token.val[0]
-    index_value_token = _resolve_index_token_to_dword(index_value_token, ltc)
-
-    if not isinstance(index_value_token, t.integer):
-        raise TypeError("Can only use an integer as an index for an array (did you miss a ';' before this statement?)")
-    
-    string_index = index_value_token.val
-
-    if string_index < 0 or string_index >= len(current_token.val):
-        raise SyntaxError(f"Tried to index a string of size {len(current_token.val)} with an index of {string_index}")
-    
-    element = current_token.val[string_index]
-    tokens[index:index + 2] = [t.char(element.val if hasattr(element, "val") else element)]
 
 def _build_let_stmts(start_index, tokens, ltc):
     t = ltc.t

@@ -16,6 +16,9 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         elif isinstance(tokens[i], n.memloc):
             resolve_memloc_oper(tokens, i, ltc)
             return True
+    elif isinstance(tokens[i], n.index_oper):
+        resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
+        return True
     elif isinstance(tokens[i], n.oper):
         if isinstance(tokens[i], n.assign):
             resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
@@ -96,6 +99,58 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         return True
 
     return False
+
+def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
+    t = ltc.t
+    helper = ltc.helper
+    base = helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
+    idx = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
+
+    if not isinstance(idx, t.integer):
+        raise TypeError("Index must resolve to an integer")
+
+    index_val = idx.val
+
+    if isinstance(base, t.array):
+        array_len = base.get_size()
+        if array_len == 0:
+            raise SyntaxError("Cannot index an empty array")
+        if index_val < 0:
+            index_val = index_val % array_len
+        if index_val >= array_len:
+            raise SyntaxError(f"Tried to index an array of size {array_len} with an index of {index_val}")
+        elem = base.val[index_val]
+        match base.arrayType:
+            case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
+                tokens[i] = t.__dict__[base.arrayType](elem.val if hasattr(elem, "val") else elem)
+            case "string":
+                tokens[i] = t.string(elem.val if hasattr(elem, "val") else elem)
+            case "boolean":
+                tokens[i] = t.boolean(elem.val if hasattr(elem, "val") else elem)
+            case _:
+                raise TypeError("Unsupported type of array used for indexing")
+        return
+
+    if isinstance(base, t.string):
+        if index_val < 0 or index_val >= len(base.val):
+            raise SyntaxError(f"Tried to index a string of size {len(base.val)} with an index of {index_val}")
+        element = base.val[index_val]
+        tokens[i] = t.char(element)
+        return
+
+    if isinstance(base, t.ltctuple):
+        tuple_len = len(base.element_types)
+        if index_val < 0:
+            index_val = index_val % tuple_len
+        if index_val >= tuple_len:
+            raise SyntaxError(f"Tried to index a tuple of size {tuple_len} with an index of {index_val}")
+        if base.inmemory and base.memloc is not None:
+            tokens[i] = t.ltctuple.read_element_from_memory(ltc, list(base.element_types), index_val, base.memloc)
+        else:
+            tokens[i] = base.val[index_val]
+        return
+
+    raise TypeError("Indexing is only supported for arrays, strings, and tuples")
 
 def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None) -> None:
     """Resolve assignment"""
@@ -205,6 +260,56 @@ def resolve_free_oper(tokens, i, ltc):
 def resolve_memloc_oper(tokens, i, ltc):
     t = ltc.t
     rhs = tokens[i].node
+
+    if isinstance(rhs, ltc.n.index_oper):
+        helper = ltc.helper
+        base = rhs.node1
+        idx = helper.resolve_node(rhs.node2, ltc, None, None, None)
+        if not isinstance(idx, t.integer):
+            raise TypeError("Index must resolve to an integer")
+
+        base_addr = None
+        element_types = None
+        elem_type = None
+
+        if isinstance(base, t.var_ref):
+            var_meta = helper.locate_var_in_namespace(ltc.namespace, base.val, return_just_the_check=False)[0]
+            if var_meta is None:
+                raise NameError(f"Variable '{base.val}' not found")
+            base_addr = var_meta["addr"]
+            if var_meta["type"] == "tuple":
+                element_types = var_meta["element_types"]
+            elif var_meta["type"] == "array":
+                elem_type = var_meta["elem_type"]
+            else:
+                raise TypeError("memloc indexing only supports tuple and array variables")
+        elif isinstance(base, t.ltctuple):
+            if not base.inmemory or base.memloc is None:
+                raise TypeError("memloc tuple indexing requires a tuple stored in memory")
+            base_addr = base.memloc
+            element_types = base.element_types
+        elif isinstance(base, t.array):
+            if not base.inmemory or base.memloc is None:
+                raise TypeError("memloc array indexing requires an array stored in memory")
+            base_addr = base.memloc
+            elem_type = base.arrayType
+        else:
+            raise TypeError("memloc indexing only supports tuple and array bases")
+
+        index_val = idx.val
+        if element_types is not None:
+            if index_val < 0 or index_val >= len(element_types):
+                raise SyntaxError(f"Tried to index a tuple of size {len(element_types)} with an index of {index_val}")
+            offset = sum(helper.get_ltc_type_size(t) for t in element_types[:index_val])
+            elem_addr = base_addr + offset
+        else:
+            if index_val < 0:
+                raise SyntaxError("Array index cannot be negative for memloc indexing")
+            offset = index_val * helper.get_ltc_type_size(elem_type)
+            elem_addr = base_addr + offset
+
+        tokens[i] = t.ptr(elem_addr)
+        return
 
     if not isinstance(rhs, t.ltc_type | t.var_ref):
         raise TypeError(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
