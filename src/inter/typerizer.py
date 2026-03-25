@@ -233,7 +233,7 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         # For simplicity, we will store tuples in memory as a contiguous block of their elements' byte representations.
         current_addr = addr # current_addr will track where we are in memory as we store each element of the tuple
         for element in self.val:
-            if type(element).__name__ in ["i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "char", "boolean"]: # only support storing primitive types in tuples for now
+            if type(element).__name__ in ["i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "char", "boolean", "ptr"]: # only support storing primitive types in tuples for now
                 element.load_to_memory(memory, current_addr)
                 current_addr += element.size
             else:
@@ -341,6 +341,10 @@ class user_function():
         for i, expected_type_name in enumerate(expected_arg_types):
             actual_arg = self.arguments[i]
             actual_type_name = type(actual_arg).__name__
+
+            if actual_type_name == "ltctuple":
+                actual_type_name = "tuple"
+
             if isinstance(actual_arg, array):
                 actual_type_name = f"{actual_arg.arrayType}[{actual_arg.get_size()}]"
 

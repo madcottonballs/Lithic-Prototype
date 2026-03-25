@@ -10,10 +10,16 @@ def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
 
         var_addr = ltc.sp
         ltc.helper.load_to_mem(ltc, argument_value, expected_type)
-        ltc.namespace[len(ltc.namespace) - 1][arg_name] = {
+        entry = {
             "type": expected_type,
             "addr": var_addr,
         }
+        if expected_type == "tuple" and isinstance(argument_value, ltc.t.ltctuple):
+            entry["element_types"] = argument_value.element_types
+        if expected_type == "array" and isinstance(argument_value, ltc.t.array):
+            entry["length"] = argument_value.get_size()
+            entry["elem_type"] = argument_value.arrayType
+        ltc.namespace[len(ltc.namespace) - 1][arg_name] = entry
 
 
 def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:

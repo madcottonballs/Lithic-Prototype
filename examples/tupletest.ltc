@@ -1,17 +1,14 @@
-define scopetest() {
-    let tuple x = makeTuple(i32, i32, i32);
-
-    iterate(i, 3) {printf(x[i]);}
-    let tuple y = makeTuple(i32, i32, i32);
-    let tuple b = makeTuple(i32, u8, i32);
-    let tuple z = concat(x, y, b);
-    printf(z);
-    printf(length(z));
-    return(0);
+define customAdd(i32 x, i32 y) {
+    let tuple result = makeTuple(i32, ptr);
+    result[0] = x + y;
+    result[1] = &result[0];
+    return(result);
 }
+
 define main() {
-    scopetest();
-    coredump(); 
-    
+    let i32 a = 5;
+    let i32 b = 10;
+    let tuple ab_result = customAdd(a, b);
+    printf(ab_result);
     return(0);
 }
