@@ -1,8 +1,8 @@
 """This module contains the main evaluation loop for walking the token tree and reducing operations, as well as processing built-in functions."""
 
-from resolve_oper import *
-from function_resolves import cmd
-from function_resolves import data
+from evalulation.resolve_oper import *
+import evalulation.cmd as cmd
+import evalulation.data as data
 
 def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
     """Load user-function arguments into the current frame namespace."""
@@ -157,4 +157,3 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             tokens[i] = t.i32(0)
 
     return return_values
-

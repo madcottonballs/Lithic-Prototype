@@ -1,8 +1,8 @@
 import helper
-import evaluator as evaluator
-import noderizer as noderizer
-import typerizer as t
-import tokenizer as tokenizer
+import evalulation.evaluator as evaluator
+import AST.noderizer as noderizer
+import token_generation.typerizer as t
+import token_generation.tokenizer as tokenizer
 import preproccesor as preproccesor
 class State:
     def __init__(self):
