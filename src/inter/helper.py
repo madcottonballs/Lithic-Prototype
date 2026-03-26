@@ -348,7 +348,7 @@ def dereference_var(ltc, var_ref_token) -> object:
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "ptr":
-            temp_instance = t.ptr(0)                          # create a temporary instance to call read_from_memory
+            temp_instance = t.ptr(0, var_name=var_ref_token.val)                          # create a temporary instance to call read_from_memory
             temp_instance = temp_instance.read_from_memory(ltc.memory, addr)
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address (used for memloc oper)

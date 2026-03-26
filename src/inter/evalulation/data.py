@@ -257,17 +257,20 @@ def resolve_deref(tokens, i, ltc) -> None:
     t = ltc.t
     helper = ltc.helper
     n = ltc.n
-    if len(tokens[i].args) != 2:
-        raise SyntaxError("@ expects exactly two arguments: @(ptr, type)")
+    if len(tokens[i].args) != 3:
+        raise SyntaxError("@ expects exactly three arguments: @(ptr, type, index)")
     
     ptr_arg = tokens[i].args[0]
     type_arg = tokens[i].args[1]
+    index_arg = tokens[i].args[2]
 
     if not isinstance(ptr_arg, t.ptr):
         raise TypeError(f"First argument to @ must be a pointer, got {type(ptr_arg).__name__}")
     if (not isinstance(type_arg, t.token)) or (not type_arg.val in ltc.types.keys()):
         raise TypeError(f"Second argument to @ must be a type name, instead got {type_arg.val}")
-    
+    if not isinstance(index_arg, t.integer):
+        raise TypeError(f"Third argument to @ must be an integer, got {type(index_arg).__name__}")
+
     match type_arg.val:
         # note: all types that are supported by @ must have .read_from_memory implemented in their ltc type class, which is used here to read the byte value from memory
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
@@ -278,10 +281,12 @@ def resolve_deref(tokens, i, ltc) -> None:
             type_size = 1
         case _:
             raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
-            
-    ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_arg.val, type_arg.val, ltc) # returns the obj read from memory
+    
+    ptr_offset: int = ptr_arg.val + (index_arg.val * type_size) # calculate the memory offset to read from by adding the base pointer value and the index multiplied by the size of the type being dereferenced. This allows for pointer arithmetic to access elements in an array or fields in a struct/tuple.
 
-    tokens[i] = n.at_func_return(ptr_deref, ptr_arg.val, type_size) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
+    ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, ptr_offset, type_arg.val, ltc) # returns the obj read from memory
+
+    tokens[i] = n.at_func_return(ptr_deref, ptr_offset, type_size, index_arg.val) # create an at_func_return_obj to hold the dereferenced value along with the original pointer and type size for use in assign_oper
 
 def resolve_tset(tokens, i, ltc) -> None:
     t = ltc.t
@@ -377,3 +382,11 @@ def resolve_maketuple(tokens, i, ltc) -> None:
         element_types.append(arg.val)
 
     tokens[i] = t.ltctuple(ltc, elements=(), element_types=element_types)
+
+def resolve_tag(tokens, i, ltc) -> None:
+    """Used for optionally tagging pointers with type information. Type info is stored in variable metadata."""
+    t = ltc.t
+    if len(tokens[i].args) != 2:
+        raise SyntaxError("tag expects exactly two arguments: tag(ptr, type)")
+    ptr_arg = tokens[i].args[0]
+    type_arg = tokens[i].args[1]

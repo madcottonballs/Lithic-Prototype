@@ -19,19 +19,12 @@ define main() {
 
     let ptr p = malloc(5);
     printf(p);
-    @(p, u8) = 5;
-    printf(@(p, u8));
+    @(p, u8, 1) = 54;
+    printf(@(p, u8, 0));
+    @(p, u8, 3) = 255;
+    printf(@(p, u8, 3));
     
     let ptr g = test();
     printf(g);
-    
-    let string temp = "";
-    while (temp != "exit") {
-        temp = input();
-        coredump();
-    }
-    let i32 yy = 10;
-    coredump();
-    printf(temp);
     return(0);
 }

@@ -211,8 +211,9 @@ class u16(integer): # u16
     def read_from_memory(self, memory, addr):
         return u16(super().read_from_memory(memory, addr))
 class ptr(u64): # ptr (64-bit unsigned integer representing a memory address)
-    def __init__(self, val):
+    def __init__(self, val, var_name=None):
         super().__init__(val)
+        self.var_name = var_name  # Optional metadata to track what variable this pointer is associated with, for tag().
     def read_from_memory(self, memory, addr):
         return ptr(super().read_from_memory(memory, addr).val) # ptr is a wrapper around u64, so we need to extract the integer value and wrap it back in a ptr
 

@@ -41,7 +41,11 @@ class State:
             "tSet",
             "pass",
             "concat",
-            "length"
+            "length",
+            "tag",
+            "untag",
+            "getTypeTag",
+            "mallocType"
         ]
         self.types = {
             "string": t.string,

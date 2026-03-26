@@ -54,10 +54,11 @@ class subexp():
 
 class at_func_return:
     """Exists so @(ptr, type) function can return a obj to be fed specifically to assign_oper. self.val holds a ltc_type read from memory."""
-    def __init__(self, val, addr, type_size):
+    def __init__(self, val, addr, type_size, index=0):
         self.val = val
         self.addr = addr
         self.type_size = type_size
+        self.index = index
 
 # mother function
 def generate_trees(tokens, ltc, start_index=0):
