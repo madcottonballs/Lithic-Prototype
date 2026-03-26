@@ -37,9 +37,9 @@
 			Addition assignment operator adds the right number to the value of the variable of an integer type.
 ###		[integer var_ref] -= [integer]
 			Subtraction assignment operator subtracts the right number from the value of the variable of an integer type.
-###		*[integer var_ref] *= [integer]
+###		[integer var_ref] *= [integer]
 			Multiplication assignment operator multiplies the right number with the value of the variable of an integer type.
-###		*[integer var_ref] /= [integer]
+###		[integer var_ref] /= [integer]
 			Division assignment operator divides the right number from the value of the variable of an integer type.
 		
 ###		[integer var_ref]++
@@ -50,15 +50,15 @@
 			Decrement operator subtracts 1 from the variable of an integer type.
 			Ex: 
 >				x--
-###		*[integer var_ref]**
+###		[integer var_ref]**
 			Double operator multiplies the variable of an integer type by 2.
 			Ex:
 >				x**
-###		*[integer var_ref]//
+###		[integer var_ref]//
 			Halve operator divides the variable of an integer type by 2.
 			Ex: 
 >				x//
-###		*[array[integer] var_ref] $ [operator] [integer]
+###		*[array[integer]] $ [operator] [integer]
 			Applies the operation to every number in the array.
 			Ex: 
 >			x $ * 5 /* every i32 in the array 'x' is multiplied by 5 */
@@ -144,7 +144,7 @@
 ##	Misc:
 ###		exit([integer])
 			Immediantly ends the program and returns the number as the exit code.
-###		import [str]
+###		import [string]
 			Inlines the code in the .ltc file referenced by the string.
 			All functions in the imported file will have their named prefixed by the filename. 
 			Ex:

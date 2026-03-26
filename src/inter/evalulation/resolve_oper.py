@@ -48,11 +48,26 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         else:
             ptr_arithmatic = False
         if (type(tokens[i].node1) != type(tokens[i].node2)) and not ptr_arithmatic:  # if not using ptr arithmetic, then the types must match. If using ptr arithmetic, then one can be a ptr and the other can be an integer.
-            # Unary-negation rewrite may produce 0 - <typed-int>; align the synthetic zero type.
-            if isinstance(tokens[i], n.sub) and tokens[i].node1.val == 0 and type(tokens[i].node1) is t.i32:
-                tokens[i].node1 = type(tokens[i].node2)(0)
+            # Allow ++/-- and // /** rewriting to use i32 literals with other integer types by aligning the literal.
+            if isinstance(tokens[i], (n.add, n.sub)):
+                if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.i32) and tokens[i].node2.val in (0, 1, 2):
+                    tokens[i].node2 = type(tokens[i].node1)(tokens[i].node2.val)
+                elif isinstance(tokens[i].node2, t.integer) and isinstance(tokens[i].node1, t.i32) and tokens[i].node1.val in (0, 1, 2):
+                    tokens[i].node1 = type(tokens[i].node2)(tokens[i].node1.val)
+            if isinstance(tokens[i], (n.mult, n.div)):
+                if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.i32) and tokens[i].node2.val in (2,):
+                    tokens[i].node2 = type(tokens[i].node1)(tokens[i].node2.val)
+                elif isinstance(tokens[i].node2, t.integer) and isinstance(tokens[i].node1, t.i32) and tokens[i].node1.val in (2,):
+                    tokens[i].node1 = type(tokens[i].node2)(tokens[i].node1.val)
+            # If alignment fixed the mismatch, continue without error.
+            if type(tokens[i].node1) == type(tokens[i].node2):
+                pass
             else:
-                raise TypeError(f"Type mismatch in operation: {type(tokens[i].node1).__name__} vs {type(tokens[i].node2).__name__}")
+            # Unary-negation rewrite may produce 0 - <typed-int>; align the synthetic zero type.
+                if isinstance(tokens[i], n.sub) and tokens[i].node1.val == 0 and type(tokens[i].node1) is t.i32:
+                    tokens[i].node1 = type(tokens[i].node2)(0)
+                else:
+                    raise TypeError(f"Type mismatch in operation: {type(tokens[i].node1).__name__} vs {type(tokens[i].node2).__name__}")
         
         if ptr_arithmatic:
             resolve_type = t.ptr
@@ -199,12 +214,76 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
     if isinstance(tokens[i].node1, n.at_func_return):
         target = tokens[i].node1
 
-        rhs = tokens[i].node2
-        helper.resolve_node(rhs, ltc, return_values, evaluate, execute_source_fn)
-
+        rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
         helper.load_to_mem(ltc, rhs, type(rhs).__name__, memidx=target.addr)
         tokens[i] = t.i32(0)
         return
+
+    if isinstance(tokens[i].node1, n.index_oper):
+        base = tokens[i].node1.node1
+        index_node = tokens[i].node1.node2
+        index_val = helper.resolve_node(index_node, ltc, return_values, evaluate, execute_source_fn)
+        if not isinstance(index_val, t.integer):
+            raise TypeError("Index must resolve to an integer")
+
+        rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
+
+        # tuple/array/ptr indexed assignment
+        if isinstance(base, t.var_ref):
+            var_meta = helper.locate_var_in_namespace(namespace, base.val, return_just_the_check=False)[0]
+            if var_meta is None:
+                raise NameError(f"Variable '{base.val}' not found")
+
+            if var_meta.get("type") == "tuple":
+                element_types = var_meta["element_types"]
+                if index_val.val < 0:
+                    index_val.val = index_val.val % len(element_types)
+                if index_val.val >= len(element_types):
+                    raise SyntaxError(f"Tuple index out of range: {index_val.val} for length {len(element_types)}")
+                if type(rhs).__name__ != element_types[index_val.val]:
+                    raise TypeError(f"tSet type mismatch: expected {element_types[index_val.val]}, got {type(rhs).__name__}")
+                t.ltctuple.update_element_in_memory(ltc, var_meta["addr"], index_val.val, rhs, list(element_types))
+                tokens[i] = t.i32(0)
+                return
+
+            if var_meta.get("type") == "array":
+                elem_type = var_meta["elem_type"]
+                array_len = var_meta["length"]
+                if index_val.val < 0:
+                    index_val.val = index_val.val % array_len
+                if index_val.val >= array_len:
+                    raise SyntaxError(f"Array index out of range: {index_val.val} for length {array_len}")
+                if type(rhs).__name__ != elem_type:
+                    raise TypeError(f"aSet type mismatch: expected {elem_type}, got {type(rhs).__name__}")
+                base_addr = var_meta["addr"]
+                match elem_type:
+                    case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
+                        elem_addr = base_addr + (index_val.val * helper.integer_type_to_size(elem_type))
+                        helper.load_to_mem(ltc, rhs, elem_type, memidx=elem_addr)
+                    case "boolean":
+                        elem_addr = base_addr + index_val.val
+                        helper.load_to_mem(ltc, rhs, "boolean", memidx=elem_addr)
+                    case "char":
+                        elem_addr = base_addr + index_val.val
+                        helper.load_to_mem(ltc, rhs, "char", memidx=elem_addr)
+                    case _:
+                        raise TypeError(f"aSet does not support element type '{elem_type}' yet")
+                tokens[i] = t.i32(0)
+                return
+
+            if var_meta.get("type") == "ptr":
+                if "tag" not in var_meta:
+                    raise ValueError(f"Pointer variable '{base.val}' is not tagged")
+                pointer_type = var_meta["tag"]
+                elem_size = helper.get_ltc_type_size(pointer_type)
+                elem_addr = var_meta["addr"]  # pointer value stored at addr
+                ptr_value = helper.read_ltc_type_from_mem(ltc.memory, elem_addr, "ptr", ltc).val
+                target_addr = ptr_value + index_val.val * elem_size
+                helper.load_to_mem(ltc, rhs, pointer_type, memidx=target_addr)
+                tokens[i] = t.i32(0)
+                return
+
+        raise TypeError("Indexed assignment requires a variable reference base")
 
     if not isinstance(tokens[i].node1, t.var_ref):
         raise TypeError("Left side of assignment must be a variable reference")

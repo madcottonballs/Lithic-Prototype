@@ -1,28 +1,26 @@
 ===CORE DUMP===
-Stack Pointer: 4
+Stack Pointer: 20
 ===============================
 Heap Pointer: 119
 ===============================
 Namespace:
 	Frame 0:
 	Frame 1:
-	Frame 2:
-		i:
-			type: i32
+		test:
+			type: array
 			addr: 0
-	Frame 3:
+			length: 5
+			elem_type: i32
 ===============================
 Stack Frames:
 	Stack Frame 0 SP: 0
-	Stack Frame 1 SP: 0
-	Stack Frame 2 SP: 4
 ===============================
 Memory:
-	[0]: 99  <-- Start of 'i' of type 'i32' | Stack frame 0 start | Stack frame 1 start
+	[0]: 1  <-- Start of 'test' of type 'array' | Stack frame 0 start
 	[1]: 0
 	[2]: 0
 	[3]: 0
-	[4]: 0  <-- (SP) | Stack frame 2 start
+	[4]: 0
 	[5]: 0
 	[6]: 0
 	[7]: 0
@@ -38,7 +36,7 @@ Memory:
 	[17]: 0
 	[18]: 0
 	[19]: 0
-	[20]: 0
+	[20]: 0  <-- (SP)
 	[21]: 0
 	[22]: 0
 	[23]: 0

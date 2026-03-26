@@ -298,12 +298,13 @@ def resolve_deref(tokens, i, ltc) -> None:
 
 def resolve_tset(tokens, i, ltc) -> None:
     t = ltc.t
+    helper = ltc.helper
     if len(tokens[i].args) != 3:
         raise SyntaxError("tSet expects exactly three arguments: tSet(tupleVar, index, value)")
 
     tuple_ref = tokens[i].args[0]
     tuple_index = tokens[i].args[1]
-    new_value = tokens[i].args[2]
+    new_value = helper.resolve_node(tokens[i].args[2], ltc, [], ltc.evaluator.evaluate, None)
     element_types = None
     base_addr = None
 
@@ -335,7 +336,7 @@ def resolve_aset(tokens, i, ltc) -> None:
 
     array_ref = tokens[i].args[0]
     array_index = tokens[i].args[1]
-    new_value = tokens[i].args[2]
+    new_value = helper.resolve_node(tokens[i].args[2], ltc, [], ltc.evaluator.evaluate, None)
 
     if not isinstance(array_ref, t.var_ref):
         raise TypeError("aSet first argument must be an array variable reference")

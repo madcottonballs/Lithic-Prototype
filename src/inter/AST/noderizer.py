@@ -12,6 +12,10 @@ class increment(oper):
     pass
 class decrement(oper):
     pass
+class double(oper):
+    pass
+class halve(oper):
+    pass
 
 
 class equal(oper):
@@ -124,25 +128,6 @@ def _build_index_node(current_token, next_token, tokens, index, ltc):
     index_token = next_token.val[0]
     tokens[index:index + 2] = [index_oper(current_token, index_token)]
 
-        
-def _resolve_index_token_to_dword(index_token, ltc):
-    """Resolve index token to i32 for indexed operations."""
-    t = ltc.t
-    helper = ltc.helper    
-    resolved_index = index_token
-    if isinstance(resolved_index, t.var_ref):
-        resolved_index = helper.dereference_var(ltc, resolved_index)
-    elif isinstance(resolved_index, t.token):
-        if helper.locate_var_in_namespace(ltc.namespace, resolved_index.val, return_just_the_check=True):
-            resolved_index = helper.dereference_var(ltc, t.var_ref(resolved_index.val))
-        elif str(resolved_index.val).isdigit():
-            resolved_index = t.i32(resolved_index.val)
-
-    if not isinstance(resolved_index, t.integer):
-        raise TypeError("Index must resolve to an integer")
-
-    return resolved_index
-
 def build_array_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     t = ltc.t
     """Build aSet(arrayRef, index, rhs) function node and replace current statement."""
@@ -224,7 +209,11 @@ def _build_array_type_tokens(tokens, t, start_index=0):
         is_primitive_type = (
             isinstance(type_token, t.token)
             and not isinstance(type_token, (t.var_ref, t.function, t.i32, t.string, t.boolean, t.array))
-            and getattr(type_token, "val", None) in {"i32", "string", "boolean"}
+            and getattr(type_token, "val", None) in {
+                "i32", "i64", "i16", "i8",
+                "u32", "u64", "u16", "u8",
+                "boolean", "char", "ptr",
+            }
         )
         if not is_primitive_type:
             index += 1
@@ -259,7 +248,7 @@ def _build_array_literals(tokens, ltc, start_index=0):
 
         # Skip array type declarations that were not reduced for any reason.
         prev_symbol = getattr(tokens[index - 1], "val", None) if index > 0 else None
-        if prev_symbol in {"i32", "string", "boolean"}:
+        if prev_symbol in {"i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "string", "boolean", "char"}:
             index += 1
             continue
 
@@ -391,6 +380,24 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
             # Advance only when we did not collapse a slice.
             index += 1
 
+def _resolve_index_token_to_dword(index_token, ltc):
+    """Resolve index token to i32 for indexed operations."""
+    t = ltc.t
+    helper = ltc.helper    
+    resolved_index = index_token
+    if isinstance(resolved_index, t.var_ref):
+        resolved_index = helper.dereference_var(ltc, resolved_index)
+    elif isinstance(resolved_index, t.token):
+        if helper.locate_var_in_namespace(ltc.namespace, resolved_index.val, return_just_the_check=True):
+            resolved_index = helper.dereference_var(ltc, t.var_ref(resolved_index.val))
+        elif str(resolved_index.val).isdigit():
+            resolved_index = t.i32(resolved_index.val)
+
+    if not isinstance(resolved_index, t.integer):
+        raise TypeError("Index must resolve to an integer")
+
+    return resolved_index
+
 def _build_opers(tokens, start_idx, ltc):
     index = start_idx
     while index < len(tokens):
@@ -444,25 +451,45 @@ def _build_opers(tokens, start_idx, ltc):
                 match tokens[index + 1].val: # next token 
                     case "=": # '+=' 
                         _check_oper_syntax_errors('+=', tokens, index)
-                        build_var_add_oper(tokens, index, ltc)
+                        build_unified_oper_assign(tokens, index, ltc, "+=")
                     case "+": # '++' increment operator
                         _check_oper_syntax_errors('++', tokens, index)
-                        build_increment_oper(tokens, index, ltc)
+                        build_var_mod_shortcut_oper(tokens, index, "++", ltc)
                     case _: # '+' add operator
                         pass # handled at a different time
             case "-":
                 match tokens[index + 1].val: # next token 
                     case "=": # '-=' 
                         _check_oper_syntax_errors('-=', tokens, index)
-                        build_var_sub_oper(tokens, index, ltc)
+                        build_unified_oper_assign(tokens, index, ltc, "-=")
                     case "-": # '--' decrement operator
                         _check_oper_syntax_errors('--', tokens, index)
-                        build_decrement_oper(tokens, index, ltc)
+                        build_var_mod_shortcut_oper(tokens, index, "--", ltc)
                     case ">": # -> arrow operator for type casting
                         _check_oper_syntax_errors('->', tokens, index)
                         build_cast_oper(tokens, index, ltc)
                         index -= 1  # re-scan after in-place replacement
                     case _: # '+' add operator
+                        pass # handled at a different time
+            case "*":
+                match tokens[index + 1].val: # next token 
+                    case "=": # '*=' 
+                        _check_oper_syntax_errors('*=', tokens, index)
+                        build_unified_oper_assign(tokens, index, ltc, "*=")
+                    case "*": # '**' exponentiation operator
+                        _check_oper_syntax_errors('**', tokens, index)
+                        build_var_mod_shortcut_oper(tokens, index, "**", ltc)
+                    case _: # '*' multiply operator
+                        pass # handled at a different time
+            case "/":
+                match tokens[index + 1].val: # next token 
+                    case "=": # '/=' 
+                        _check_oper_syntax_errors('/=', tokens, index)
+                        build_unified_oper_assign(tokens, index, ltc, "/=")
+                    case "/": # '//' floor division operator
+                        _check_oper_syntax_errors('//', tokens, index)
+                        build_var_mod_shortcut_oper(tokens, index, "//", ltc)
+                    case _: # '*' multiply operator
                         pass # handled at a different time
             case "^":
                 build_free_oper(tokens, index)

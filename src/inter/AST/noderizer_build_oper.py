@@ -107,114 +107,76 @@ def build_assign_oper(tokens, index, ltc):
     assign_node = n.assign(tokens[index - 1], rhs_tokens[0])
     tokens[index - 1:] = [assign_node]
 
-def build_var_add_oper(tokens, index, ltc):
+def build_unified_oper_assign(tokens, index, ltc, oper: str):
+    """This function is used to handle operators that have a unified operator for both addition and subtraction (like '+=' and '-='). It checks the operator type and then builds the appropriate operation node (like n.add or n.sub) and then creates an assignment node that assigns the result back to the left hand side variable. This is used to reduce code duplication between similar operators."""
     t = ltc.t
-    helper = ltc.helper    
-    # Build: x += expr  ->  n.assign(x, n.add(value_of_x, expr))
+    # Example Build: x += expr  ->  n.assign(x, n.add(value_of_x, expr))
     if index + 2 >= len(tokens):
-        raise SyntaxError("operator `+=` must be followed by a value.")
+        raise SyntaxError(f"operator `{oper}` must be followed by a value.")
 
     lhs_ref = tokens[index - 1]
-    if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Left side of '+=' must be a variable reference")
+    lhs_ref = handle_var_ref_or_index(tokens, index, oper, lhs_ref, ltc)
 
     # Parse and reduce the RHS expression after '+='.
     rhs_tokens = tokens[index + 2:]
     n.generate_trees(rhs_tokens, ltc, 0)
     if len(rhs_tokens) != 1:
-        raise SyntaxError("right hand side during '+=' did not reduce to a single value")
+        raise SyntaxError(f"right hand side during '{oper}' did not reduce to a single value")
 
-    lhs_value = helper.dereference_var(ltc, lhs_ref)
-    add_node = n.add(lhs_value, rhs_tokens[0])
-    assign_node = n.assign(lhs_ref, add_node)
+    match oper:
+        case "+=":
+            operation_node = n.add(lhs_ref, rhs_tokens[0])
+        case "-=":
+            operation_node = n.sub(lhs_ref, rhs_tokens[0])
+        case "*=":
+            operation_node = n.mult(lhs_ref, rhs_tokens[0])
+        case "/=":
+            operation_node = n.div(lhs_ref, rhs_tokens[0])
+        case _:
+            raise ValueError(f"Unsupported operator: {oper}")
+    assign_node = n.assign(lhs_ref, operation_node)
     tokens[index - 1:] = [assign_node]
 
-def build_var_sub_oper(tokens, index, ltc):
+def handle_var_ref_or_index(tokens, index, oper, lhs_ref, ltc):
+    """This function is used to handle cases where the left hand side of an operator could be either a variable reference or an index operation (like x[i]). It checks the type of the left hand side and if it's not a variable reference or index operation, it tries to build an index operation if the syntax matches that pattern. If it can't, it raises a TypeError. This is used by operators like '++' and '--' that can operate on both variables and indexed expressions."""
     t = ltc.t
-    helper = ltc.helper    
-    # Build: x -= expr  ->  n.assign(x, n.sub(value_of_x, expr))
-    if index + 2 >= len(tokens):
-        raise SyntaxError("operator `-=` must be followed by a value.")
+    # check if the left hand side is a variable reference or an index operation (like x[i])    
+    if not isinstance(lhs_ref, (t.var_ref, n.index_oper)):
+        # last chance: try to build a index oper, if we cant, error
+        if index >= 2 and isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
+            return n.index_oper(tokens[index - 2], tokens[index - 1].val[0])
+        else:
+            raise TypeError(f"Left side of '{oper}' must be a variable reference or index expression")
+    return lhs_ref
 
-    lhs_ref = tokens[index - 1]
-    if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Left side of '-=' must be a variable reference")
-
-    # Parse and reduce the RHS expression after '-='.
-    rhs_tokens = tokens[index + 2:]
-    n.generate_trees(rhs_tokens, ltc, 0)
-    if len(rhs_tokens) != 1:
-        raise SyntaxError("right hand side during '-=' did not reduce to a single value")
-
-    lhs_value = helper.dereference_var(ltc, lhs_ref)
-    sub_node = n.sub(lhs_value, rhs_tokens[0])
-    assign_node = n.assign(lhs_ref, sub_node)
-    tokens[index - 1:] = [assign_node]
-
-def build_decrement_oper(tokens, index, ltc):
-    # Build: x--  ->  n.assign(x, n.sub(value_of_x, 1))
+def build_var_mod_shortcut_oper(tokens, index, oper: str, ltc):
     t = ltc.t
-    helper = ltc.helper
+    # Build: x++  ->  n.assign(x, n.add(x, 1))
     lhs_ref = tokens[index - 1]
 
-    # Indexed decrement rewrite: x[i]--  ->  aSet(x, i, x[i] - 1)
-    if index >= 2 and isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
-        array_ref = tokens[index - 2]
-        index_token = n._resolve_index_token_to_dword(tokens[index - 1].val[0], ltc)
-        array_value = helper.dereference_var(ltc, array_ref)
+    lhs_ref = handle_var_ref_or_index(tokens, index, oper, lhs_ref, ltc)
+    # Use typed literal when LHS is a plain variable reference to avoid i32-only math.
+    literal_factory = None
+    if isinstance(lhs_ref, t.var_ref):
+        lhs_value = ltc.helper.dereference_var(ltc, lhs_ref)
+        if isinstance(lhs_value, t.integer):
+            literal_factory = type(lhs_value)
 
-        if index_token.val < 0 or index_token.val >= array_value.get_size():
-            raise SyntaxError(f"Tried to index an array of size {array_value.get_size()} with an index of {index_token.val}")
-        
-        current_value = array_value.val[index_token.val]
+    match oper:
+        case "++":
+            operation_node = n.add(lhs_ref, (literal_factory(1) if literal_factory else t.i32(1)))
+        case "--":
+            operation_node = n.sub(lhs_ref, (literal_factory(1) if literal_factory else t.i32(1)))
+        case "**":
+            operation_node = n.mult(lhs_ref, (literal_factory(2) if literal_factory else t.i32(2)))
+        case "//":
+            operation_node = n.div(lhs_ref, (literal_factory(2) if literal_factory else t.i32(2)))
+        case _:
+            raise ValueError(f"Unsupported operator: {oper}")
 
-        if not isinstance(current_value, t.integer):
-            raise TypeError("array[idx]-- currently supports integer array elements only")
-
-        sub_node = n.sub(current_value, type(current_value)(1))
-        set_call = n.build_array_set_call(array_ref, tokens[index - 1], sub_node, ltc)
-        tokens[index - 2:index + 2] = [set_call]
-        return
-
-    if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Left side of '--' must be a variable reference")
-
-    lhs_value = helper.dereference_var(ltc, lhs_ref)
-    sub_node = n.sub(lhs_value, type(lhs_value)(1))
-    assign_node = n.assign(lhs_ref, sub_node)
+    assign_node = n.assign(lhs_ref, operation_node)
     tokens[index - 1:index + 2] = [assign_node]
 
-def build_increment_oper(tokens, index, ltc):
-    t = ltc.t
-    helper = ltc.helper    
-    # Build: x++  ->  n.assign(x, n.add(value_of_x, 1))
-    lhs_ref = tokens[index - 1]
-
-    # Indexed increment rewrite: x[i]++  ->  aSet(x, i, x[i] + 1)
-    if index >= 2 and isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
-        array_ref = tokens[index - 2]
-        index_token = n._resolve_index_token_to_dword(tokens[index - 1].val[0], ltc)
-        array_value: list[n.integer] = helper.dereference_var(ltc, array_ref)
-
-        if index_token.val < 0 or index_token.val >= array_value.get_size():
-            raise SyntaxError(f"Tried to index an array of size {array_value.get_size()} with an index of {index_token.val}")
-        
-        current_value = array_value.val[index_token.val]
-        if not isinstance(current_value, t.integer):
-            raise TypeError(f"For arrays, increment operator currently supports incrementing integer[] arrays, not {type(current_value).__name__}")
-
-        add_node = n.add(current_value, type(current_value)(1))
-        set_call = n.build_array_set_call(array_ref, tokens[index - 1], add_node, ltc)
-        tokens[index - 2:index + 2] = [set_call]
-        return
-
-    if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Left side of '++' must be a variable reference")
-
-    lhs_value = helper.dereference_var(ltc, lhs_ref)
-    add_node = n.add(lhs_value, type(lhs_value)(1))
-    assign_node = n.assign(lhs_ref, add_node)
-    tokens[index - 1:index + 2] = [assign_node]
 
 def build_equal_oper(tokens, index, ltc):
     equal_node = n.equal(tokens[index - 1], tokens[index + 2])
