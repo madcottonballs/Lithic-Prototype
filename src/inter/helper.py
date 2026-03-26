@@ -407,7 +407,7 @@ def get_ltc_type_size(type_name: str) -> int:
             return 4
         case "i64"|"u64":
             return 8
-        case "string" | "array" | "tuple":
+        case "string" | "array" | "tuple" | "ltctuple":
             raise ValueError(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
         case _:
             raise ValueError(f"Unknown LTC type: {type_name}")

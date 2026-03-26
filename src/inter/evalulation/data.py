@@ -98,6 +98,14 @@ def resolve_sizeof(tokens, i, ltc) -> None:
             tokens[i] = t.i32(arg.get_size())
         case t.i32 | t.i64 | t.i8 | t.i16 | t.u32 | t.u64 | t.u8 | t.u16 | t.boolean | t.char | t.ptr:
             tokens[i] = t.i32(helper.get_ltc_type_size(type(arg).__name__))
+        case t.token:
+            if arg.val in ltc.types:
+                type_name = arg.val
+                if type_name in ("string", "array", "tuple", "ltctuple"):
+                    raise TypeError(f"sizeof cannot be used on dynamically sized types like '{type_name}' without an instance. Use sizeof(var) instead of sizeof(type) for these types.")
+                tokens[i] = t.i32(helper.get_ltc_type_size(type_name))
+            else:
+                raise TypeError(f"Token argument to sizeof must be a valid type name, got '{arg.val}'")
         case _:
             raise TypeError(f"Unsupported argument type for sizeof: {type(arg).__name__}")
 
@@ -390,3 +398,91 @@ def resolve_tag(tokens, i, ltc) -> None:
         raise SyntaxError("tag expects exactly two arguments: tag(ptr, type)")
     ptr_arg = tokens[i].args[0]
     type_arg = tokens[i].args[1]
+    if not isinstance(ptr_arg, t.ptr):
+        raise TypeError(f"First argument to tag must be a pointer, got {type(ptr_arg).__name__}")
+    if not isinstance(type_arg, t.token) or type_arg.val not in ltc.types:
+        raise TypeError(f"Second argument to tag must be a valid type, got {type(type_arg).__name__}")
+
+    if ptr_arg.var_name == None:
+        raise ValueError("Only pointer variables can be tagged, but got an unreferenced pointer")
+    
+    # check if the variable exists, it should but let's be safe
+    var_data = ltc.helper.locate_var_in_namespace(ltc.namespace, ptr_arg.var_name, return_just_the_check=False)
+    (var_meta, scope_level) = var_data
+    if var_meta is None:
+        raise NameError(f"Variable '{ptr_arg.var_name}' not found for tagging")
+    
+    ltc.namespace[scope_level][ptr_arg.var_name]["tag"] = type_arg.val # store the tag in the variable's metadata
+    tokens[i] = t.i32(0) # return 0 for success (could also return the pointer itself or the tag if desired)
+
+def resolve_untag(tokens, i, ltc) -> None:
+    """Used for optionally untagging pointers with type information. Type info is stored in variable metadata."""
+    t = ltc.t
+    if len(tokens[i].args) != 1:
+        raise SyntaxError("untag expects exactly one argument: untag(ptr)")
+    ptr_arg = tokens[i].args[0]
+    if not isinstance(ptr_arg, t.ptr):
+        raise TypeError(f"Argument to untag must be a pointer, got {type(ptr_arg).__name__}")
+
+    if ptr_arg.var_name == None:
+        raise ValueError("Only pointer variables can be untagged, but got an unreferenced pointer")
+    
+    # check if the variable exists, it should but let's be safe
+    var_data = ltc.helper.locate_var_in_namespace(ltc.namespace, ptr_arg.var_name, return_just_the_check=False)
+    (var_meta, scope_level) = var_data
+    if var_meta is None:
+        raise NameError(f"Variable '{ptr_arg.var_name}' not found for untagging")
+    
+    if "tag" in ltc.namespace[scope_level][ptr_arg.var_name]:
+        del ltc.namespace[scope_level][ptr_arg.var_name]["tag"] # remove the tag from the variable's metadata
+    tokens[i] = t.i32(0) # return 0 for success (could also return the pointer itself if desired)
+
+def resolve_gettypetag(tokens, i, ltc) -> None:
+    """Used for retrieving the type tag from a tagged pointer."""
+    t = ltc.t
+    if len(tokens[i].args) != 1:
+        raise SyntaxError("getTypeTag expects exactly one argument: getTypeTag(ptr)")
+    ptr_arg = tokens[i].args[0]
+    if not isinstance(ptr_arg, t.ptr):
+        raise TypeError(f"Argument to getTypeTag must be a pointer, got {type(ptr_arg).__name__}")
+
+    if ptr_arg.var_name == None:
+        raise ValueError("Only pointer variables can have type tags, but got an unreferenced pointer")
+    
+    # check if the variable exists, it should but let's be safe
+    var_data = ltc.helper.locate_var_in_namespace(ltc.namespace, ptr_arg.var_name, return_just_the_check=False)
+    (var_meta, scope_level) = var_data
+    if var_meta is None:
+        raise NameError(f"Variable '{ptr_arg.var_name}' not found for retrieving type tag")
+    
+    if "tag" not in ltc.namespace[scope_level][ptr_arg.var_name]:
+        raise ValueError(f"Variable '{ptr_arg.var_name}' is not tagged")
+    
+    tokens[i] = t.string(ltc.namespace[scope_level][ptr_arg.var_name]["tag"]) # return the tag as a token for easy comparison in user code
+
+def resolve_malloctype(tokens, i, ltc) -> None:
+    if len(tokens[i].args) != 2:
+        raise SyntaxError("mallocType expects exactly two arguments: mallocType(type, count)")
+    type_arg = tokens[i].args[0]
+    count_arg = tokens[i].args[1]
+    if not isinstance(type_arg, ltc.t.token) or type_arg.val not in ltc.types:
+        raise TypeError(f"mallocType type argument must be a valid type, got {type(type_arg).__name__}")
+    if not isinstance(count_arg, ltc.t.integer):
+        raise TypeError(f"mallocType count argument must be an integer, got {type(count_arg).__name__}")
+
+    num_of_bytes = ltc.helper.get_ltc_type_size(type_arg.val) * count_arg.val
+
+    ltc.helper.malloc(num_of_bytes, ltc)
+
+    tokens[i] = ltc.t.ptr(ltc.hp) 
+
+def resolve_malloc(tokens, i, ltc) -> None:
+    if len(tokens[i].args) != 1:
+        raise SyntaxError("malloc expects exactly one argument")
+    arg = tokens[i].args[0]
+    if not isinstance(arg, ltc.t.integer):
+        raise TypeError(f"malloc size argument must be an integer, got {type(arg).__name__}")
+    
+    ltc.helper.malloc(arg.val, ltc)
+
+    tokens[i] = ltc.t.ptr(ltc.hp) 

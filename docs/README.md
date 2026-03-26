@@ -66,13 +66,20 @@
 ###		![boolean]
 			Inverts the boolean. false becomes true, true becomes false.
 ##	pointers:
-###		*@[ptr]
+###		@([ptr], [type], [idx])
 			Dereferences a ptr.
+			The type argument specifies the type of the object the ptr is referencing.
+			The idx argument is used to specify how many objects of the type specified to jump over.
+			(ptr + (sizeof(type) * idx))
 			Ex:
 ```
 				let i32 x = 5;
-				let ptr y = &x;
-				printf(@y)		*/ output: 5 /*
+				let ptr px = &x;
+				printf(@(px, i32, 0))		*/ output: 5 /*
+			
+				let ptr temp = mallocType(i32, 5);
+				@(temp, i32, 0) = 30;
+				@(temp, i32, 1) = 50;
 ```
 ###		&[any]
 			Memloc operator.
@@ -208,8 +215,9 @@
 		
 ###		sizeof([any])
 			Will return the byte size of each data type as a i32.
+			You can pass in any type or a type reference.
 			Ex:
->			sizeof(5)	/* This example would return 4, because dwords have a byte size of 4. */
+>			sizeof(5)	/* This example would return 4, because i32's have a byte size of 4. */
 ###		cast([any], [type])
 			Equivalent to the cast operator.
 			Cast function converts the first obj into the type referenced.
@@ -272,7 +280,7 @@
 					For example, the string "273" can turn to a u64 (and so can be a ptr), but the string "hello" cannot turn to a ptr type.
 
 ### 	malloc([i32])
-			Reserves a block of memory in the stack for the programmer to use.
+			Reserves a block of memory in the heap for the programmer to use.
 			The size of this new memory is determined by the argument passed in.
 			Returns a ptr to the first byte of this block.
 			In the interpreted version, if you allocate beyond the range of the virtual memory, it currently throws an error. Eventually *dynamic expansion will be supported.
@@ -280,9 +288,43 @@
 >				let ptr x = malloc(5);
 			This reserves 5 bytes for the programmer to use, x is a ptr to the first byte.
 
+###		mallocType([type], [i32])
+			Reserves a block of memory in the heap for the programmer to use.
+			The size of this new memory is (sizeof(type) * arg_2).
+			Returns a ptr to the first byte of this block.
+			In the interpreted version, if you allocate beyond the range of the virtual memory, it currently throws an error. Eventually *dynamic expansion will be supported.
+			Ex:
+>				let ptr x = mallocType(i32, 5);
+			This reserves five i32's (20 bytes) for the programmer to use, x is a ptr to the first byte.
+
 ###		coredump()
 			In interprter version, currently prints the sp and virtual memory contents.
 			Will eventually dump to a *file in both versions.
+
+###		tag([ptr], [type])
+			Lets the interpreter/compiler know a ptr variable references a specific type.
+			This lets you do ptr derefencing without specifying type everytime.
+			This is totally optional.
+			Ex:
+```
+				let ptr px = mallocType(i32, 10);   /* allocate space for ten 32 bit signed integers */
+				tag(px, i32)						/* px always refers to a i32 now */
+				px[0] = 20;							/* no need to specify how many bytes like in raw syntax */
+				px[3] = 939;						/* equivalent to @(px, i32, 3) = 939; */
+```
+###		getTypeTag([ptr])
+			Returns a token containing the type the ptr variable is tagged with.
+			Will throw an error if the ptr variable is untagged.
+			Ex:
+```
+				let ptr px = mallocType(u64, 50);
+				tag(px, u64);
+				px[46] = 29472319;
+				printf(getTypeTag(px));		/* output: u64
+```
+
+###		untag([ptr])
+			Removes a type tag from a ptr.
 
 # Control Flow:
 ##	if ([boolean]) { ... }

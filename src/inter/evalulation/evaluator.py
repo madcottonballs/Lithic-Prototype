@@ -129,15 +129,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             data.resolve_cast_function(tokens, i, ltc)
         
         case "malloc":
-            if len(tokens[i].args) != 1:
-                raise SyntaxError("malloc expects exactly one argument")
-            arg = tokens[i].args[0]
-            if not isinstance(arg, t.integer):
-                raise TypeError(f"malloc size argument must be an integer, got {type(arg).__name__}")
-            
-            helper.malloc(arg.val, ltc)
-
-            tokens[i] = t.ptr(ltc.hp) 
+            data.resolve_malloc(tokens, i, ltc)
         
         case "coredump":
             cmd.resolve_coredump(tokens, i, ltc)
@@ -155,5 +147,13 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             data.resolve_maketuple(tokens, i, ltc)        
         case "pass":
             tokens[i] = t.i32(0)
+        case "tag":
+            data.resolve_tag(tokens, i, ltc)
+        case "untag":
+            data.resolve_untag(tokens, i, ltc)
+        case "getTypeTag":
+            data.resolve_gettypetag(tokens, i, ltc)
+        case "mallocType":
+            data.resolve_malloctype(tokens, i, ltc)
 
     return return_values

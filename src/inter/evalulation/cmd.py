@@ -11,6 +11,8 @@ def ltc_print(ltc, tokens, i) -> None:
     elif isinstance(arg, t.ltctuple):
         rendered = ", ".join(str(element.val) for element in arg.val)
         print(f"tuple({rendered})", end="\n")
+    elif isinstance(arg, t.token) and arg.val in ltc.types:
+        print(f"<type {arg.val}>", end="\n")
     else:
         raise TypeError(f"Unsupported argument type for printf(): {type(arg).__name__}")
     tokens[i] = t.i32(0)

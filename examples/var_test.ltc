@@ -3,7 +3,7 @@ define test() {
     return(h);    
 }
 define main() { 
-    printf("expected output: 6, Hello, world!, True, A, 5, <ptr as num>, <ptr as num>");
+    /*printf("expected output: 6, Hello, world!, True, A, 5, <ptr as num>, <ptr as num>");
 
     let i32 x = 6;
     printf(x);
@@ -16,15 +16,14 @@ define main() {
 
     let char c = 'A';
     printf(c);
+*/
+    let ptr p = mallocType(u8, 5);
+    tag(p, u8);
+    printf(getTypeTag(p));
 
-    let ptr p = malloc(5);
-    printf(p);
     @(p, u8, 1) = 54;
-    printf(@(p, u8, 0));
+    printf(@(p, u8, 1));
     @(p, u8, 3) = 255;
     printf(@(p, u8, 3));
-    
-    let ptr g = test();
-    printf(g);
     return(0);
 }
