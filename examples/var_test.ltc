@@ -1,29 +1,13 @@
-define test() {
-    let ptr h = malloc(10);
-    return(h);    
-}
 define main() { 
-    /*printf("expected output: 6, Hello, world!, True, A, 5, <ptr as num>, <ptr as num>");
-
-    let i32 x = 6;
-    printf(x);
-
-    let string str = "Hello, world!";
-    printf(str);
-
-    let boolean b = true;
-    printf(b);
-
-    let char c = 'A';
-    printf(c);
-*/
-    let ptr p = mallocType(u8, 5);
+    let ptr p = mallocType(u8, 100);
     tag(p, u8);
-    printf(getTypeTag(p));
 
-    @(p, u8, 1) = 54;
-    printf(@(p, u8, 1));
-    @(p, u8, 3) = 255;
-    printf(@(p, u8, 3));
+    iterate (i, 100) {
+        p[i] = i;
+    }
+    iterate (i, 100) {
+        printf(p[i]);
+    }
+    coredump();
     return(0);
 }

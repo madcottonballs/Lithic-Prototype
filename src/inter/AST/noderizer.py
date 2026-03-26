@@ -53,7 +53,7 @@ class subexp():
         self.val = val
 
 class at_func_return:
-    """Exists so @(ptr, type) function can return a obj to be fed specifically to assign_oper. self.val holds a ltc_type read from memory."""
+    """Exists so @(ptr, type, idx) function can return a obj to be fed specifically to assign_oper. self.val holds a ltc_type read from memory."""
     def __init__(self, val, addr, type_size, index=0):
         self.val = val
         self.addr = addr
@@ -98,6 +98,9 @@ def _build_indexing(start_index, tokens, ltc):
         type_of_current_token = type(current_token).__name__
         type_of_next_token = type(next_token).__name__
         match type_of_current_token:
+            case "ptr":
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    _build_index_node(current_token, next_token, tokens, index, ltc)
             case "memloc":
                 if type_of_next_token == "array" and next_token.get_size() == 1:
                     index_token = next_token.val[0]
@@ -145,11 +148,10 @@ def build_array_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     """Build aSet(arrayRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
         raise TypeError("Indexed assignment requires a variable reference as the array base")
-    index_token = _resolve_index_token_to_dword(lhs_index_token, ltc)
     args = [
         lhs_ref,
         t.token(","),
-        index_token,
+        lhs_index_token,
         t.token(","),   
         rhs_value,
     ]
@@ -161,11 +163,10 @@ def build_tuple_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     """Build tSet(tupleRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
         raise TypeError("Indexed assignment requires a variable reference as the tuple base")
-    index_token = _resolve_index_token_to_dword(lhs_index_token, ltc)
     args = [
         lhs_ref,
         t.token(","),
-        index_token,
+        lhs_index_token,
         t.token(","),   
         rhs_value,
     ]

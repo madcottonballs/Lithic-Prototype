@@ -16,10 +16,10 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         elif isinstance(tokens[i], n.memloc):
             resolve_memloc_oper(tokens, i, ltc)
             return True
-    elif isinstance(tokens[i], n.index_oper):
-        resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
-        return True
     elif isinstance(tokens[i], n.oper):
+        if isinstance(tokens[i], n.index_oper):
+            resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
+            return True
         if isinstance(tokens[i], n.assign):
             resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True
@@ -109,7 +109,7 @@ def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_f
     if not isinstance(idx, t.integer):
         raise TypeError("Index must resolve to an integer")
 
-    index_val = idx.val
+    index_val: int = idx.val
 
     if isinstance(base, t.array):
         array_len = base.get_size()
@@ -148,6 +148,38 @@ def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_f
             tokens[i] = t.ltctuple.read_element_from_memory(ltc, list(base.element_types), index_val, base.memloc)
         else:
             tokens[i] = base.val[index_val]
+        return
+    
+    if isinstance(base, t.ptr):
+        if index_val < 0:
+            raise SyntaxError(f"Cannot use negative index {index_val} for pointer indexing, as there is no defined size for the pointer's referent type to use for wrapping the index like we do for arrays and tuples")
+
+        ptr_base_addr = base.val
+
+        # find the variable in the namespace that corresponds to this pointer to get its type tag for proper pointer arithmetic
+        # we are doing this to get the element_size
+        # element_size is needed to calculate the offset for pointer arithmetic 
+        if base.var_name == None:
+            raise ValueError("Only pointer variables can have type tags, but got an unreferenced pointer")
+        
+        # check if the variable exists, it should but let's be safe
+        var_data = ltc.helper.locate_var_in_namespace(ltc.namespace, base.var_name, return_just_the_check=False)
+        (var_meta, scope_level) = var_data
+        if var_meta is None:
+            raise NameError(f"Variable '{base.var_name}' not found for retrieving type tag")
+        
+        if "tag" not in ltc.namespace[scope_level][base.var_name]:
+            raise ValueError(f"Variable '{base.var_name}' is not tagged")
+        
+        pointer_type: str = ltc.namespace[scope_level][base.var_name]["tag"]
+        element_size: int = helper.get_ltc_type_size(pointer_type)
+
+        # now that we have element_size, we can calculate the memory address of the indexed element and return a pointer to that address
+
+        elem_addr = ptr_base_addr + index_val * element_size
+
+        ptr_deref = helper.read_ltc_type_from_mem(ltc.memory, elem_addr, pointer_type, ltc) # returns the obj read from memory
+        tokens[i] = ptr_deref
         return
 
     raise TypeError("Indexing is only supported for arrays, strings, and tuples")

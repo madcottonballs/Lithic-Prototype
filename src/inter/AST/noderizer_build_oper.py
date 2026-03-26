@@ -59,8 +59,22 @@ def build_assign_oper(tokens, index, ltc):
             var_meta = ltc.helper.locate_var_in_namespace(ltc.namespace, lhs_ref.val, return_just_the_check=False)[0]
             if var_meta and var_meta.get("type") == "tuple":
                 set_call = n.build_tuple_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
-            else:
-                set_call = n.build_array_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
+                tokens[index - 1:] = [set_call]
+                return
+            if var_meta and var_meta.get("type") == "ptr":
+                if "tag" not in var_meta:
+                    raise ValueError(f"Pointer variable '{lhs_ref.val}' is not tagged")
+                deref_call = t.function("@", [
+                    lhs_ref,
+                    t.token(","),
+                    t.token(var_meta["tag"]),
+                    t.token(","),
+                    index_token,
+                ])
+                assign_node = n.assign(deref_call, rhs_tokens[0])
+                tokens[index - 1:] = [assign_node]
+                return
+            set_call = n.build_array_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
             tokens[index - 1:] = [set_call]
             return
 
@@ -70,8 +84,22 @@ def build_assign_oper(tokens, index, ltc):
             var_meta = ltc.helper.locate_var_in_namespace(ltc.namespace, lhs_ref.val, return_just_the_check=False)[0]
             if var_meta and var_meta.get("type") == "tuple":
                 set_call = n.build_tuple_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
-            else:
-                set_call = n.build_array_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
+                tokens[index - 2:] = [set_call]
+                return
+            if var_meta and var_meta.get("type") == "ptr":
+                if "tag" not in var_meta:
+                    raise ValueError(f"Pointer variable '{lhs_ref.val}' is not tagged")
+                deref_call = t.function("@", [
+                    lhs_ref,
+                    t.token(","),
+                    t.token(var_meta["tag"]),
+                    t.token(","),
+                    index_token,
+                ])
+                assign_node = n.assign(deref_call, rhs_tokens[0])
+                tokens[index - 2:] = [assign_node]
+                return
+            set_call = n.build_array_set_call(lhs_ref, index_token, rhs_tokens[0], ltc)
             tokens[index - 2:] = [set_call]
             return
 
