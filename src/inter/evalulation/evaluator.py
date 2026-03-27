@@ -1,6 +1,6 @@
 """This module contains the main evaluation loop for walking the token tree and reducing operations, as well as processing built-in functions."""
 
-from evalulation.resolve_oper import *
+from evalulation.operators import *
 import evalulation.cmd as cmd
 import evalulation.data as data
 
@@ -155,5 +155,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             data.resolve_gettypetag(tokens, i, ltc)
         case "mallocType":
             data.resolve_malloctype(tokens, i, ltc)
+        case "cmd":
+            cmd.resolve_cmd(tokens, i, ltc)
 
     return return_values

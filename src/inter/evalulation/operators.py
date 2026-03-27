@@ -230,7 +230,7 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
 
         # tuple/array/ptr indexed assignment
         if isinstance(base, t.var_ref):
-            var_meta = helper.locate_var_in_namespace(namespace, base.val, return_just_the_check=False)[0]
+            var_meta: dict = helper.locate_var_in_namespace(namespace, base.val, return_just_the_check=False)[0]
             if var_meta is None:
                 raise NameError(f"Variable '{base.val}' not found")
 
@@ -257,8 +257,8 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
                     raise TypeError(f"aSet type mismatch: expected {elem_type}, got {type(rhs).__name__}")
                 base_addr = var_meta["addr"]
                 match elem_type:
-                    case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-                        elem_addr = base_addr + (index_val.val * helper.integer_type_to_size(elem_type))
+                    case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
+                        elem_addr = base_addr + (index_val.val * helper.get_ltc_type_size(elem_type))
                         helper.load_to_mem(ltc, rhs, elem_type, memidx=elem_addr)
                     case "boolean":
                         elem_addr = base_addr + index_val.val
@@ -425,7 +425,7 @@ def resolve_memloc_oper(tokens, i, ltc):
     if not isinstance(rhs, t.ltc_type | t.var_ref):
         raise TypeError(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
 
-    ltc.helper.resolve_node(rhs, ltc, None, None, None) # can just pass None for the last three arguments since resolve_node will not use them when resolving a var_ref
+    rhs = ltc.helper.resolve_node(rhs, ltc, None, None, None) # can just pass None for the last three arguments since resolve_node will not use them when resolving a var_ref
 
     if not rhs.inmemory:
         raise TypeError(f"Object '{rhs.val}' of type '{type(rhs).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")

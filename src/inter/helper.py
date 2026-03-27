@@ -360,8 +360,8 @@ def dereference_var(ltc, var_ref_token) -> object:
             match elem_type:
                 case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
                     for index in range(length):
-                        element_addr = addr + (index * integer_type_to_size(elem_type))
-                        element_value = int.from_bytes(ltc.memory[element_addr:element_addr + integer_type_to_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
+                        element_addr = addr + (index * get_ltc_type_size(elem_type))
+                        element_value = int.from_bytes(ltc.memory[element_addr:element_addr + get_ltc_type_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
                         values.append(t.__dict__[elem_type](element_value))
                 case "boolean":
                     for index in range(length):
@@ -437,10 +437,10 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
 
     match resolved_type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            byte_rep_of_val = object.val.to_bytes(integer_type_to_size(resolved_type), byteorder='little', signed=integer_type_to_signedness(resolved_type))
-            ltc.memory[write_ptr:write_ptr + integer_type_to_size(resolved_type)] = byte_rep_of_val
+            byte_rep_of_val = object.val.to_bytes(get_ltc_type_size(resolved_type), byteorder='little', signed=integer_type_to_signedness(resolved_type))
+            ltc.memory[write_ptr:write_ptr + get_ltc_type_size(resolved_type)] = byte_rep_of_val
             if memidx is None:
-                ltc.sp += integer_type_to_size(resolved_type)
+                ltc.sp += get_ltc_type_size(resolved_type)
         case "string":
             if memidx is None:
                 add_string_to_memory(object, ltc.memory, ltc)
@@ -456,7 +456,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             array_ptr = write_ptr
             match object.arrayType:
                 case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-                    element_width = integer_type_to_size(object.arrayType)
+                    element_width = get_ltc_type_size(object.arrayType)
                     for i, element in enumerate(object.val):
                         element_ptr = array_ptr + (i * element_width)
                         load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
@@ -605,7 +605,7 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
     ltc_type = ltc.types[type_str]
     match type_str:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            return ltc_type(int.from_bytes(memory[addr:addr + integer_type_to_size(type_str)], byteorder='little', signed=integer_type_to_signedness(type_str)))
+            return ltc_type(int.from_bytes(memory[addr:addr + get_ltc_type_size(type_str)], byteorder='little', signed=integer_type_to_signedness(type_str)))
         case "string":
             end = addr
             while end < len(memory) and memory[end] != 0:

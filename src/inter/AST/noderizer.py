@@ -248,7 +248,7 @@ def _build_array_literals(tokens, ltc, start_index=0):
 
         # Skip array type declarations that were not reduced for any reason.
         prev_symbol = getattr(tokens[index - 1], "val", None) if index > 0 else None
-        if prev_symbol in {"i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "string", "boolean", "char"}:
+        if prev_symbol in {"i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "ptr", "boolean", "char"}:
             index += 1
             continue
 

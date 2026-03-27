@@ -3,9 +3,10 @@ import "dictlib.ltc";
 define main() {
     /*let ptr test = dictlib.makeDict();*/
     let ptr x = malloc(5);
-    @(x) = 10;
+    tag(x, u8);
+    x[0] = 10;
     iterate(i, 5) {
-        printf(@(x + i));
+        printf(x[i]);
     }
     return(0);
 }

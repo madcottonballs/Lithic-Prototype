@@ -366,8 +366,8 @@ def resolve_aset(tokens, i, ltc) -> None:
 
     base_addr = var_meta["addr"]
     match elem_type:
-        case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            elem_addr = base_addr + (array_index.val * helper.integer_type_to_size(elem_type))
+        case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
+            elem_addr = base_addr + (array_index.val * helper.get_ltc_type_size(elem_type))
             helper.load_to_mem(ltc, new_value, elem_type, memidx=elem_addr)
         case "boolean":
             elem_addr = base_addr + array_index.val

@@ -4,6 +4,7 @@ import AST.noderizer as noderizer
 import token_generation.typerizer as t
 import token_generation.tokenizer as tokenizer
 import preproccesor as preproccesor
+import os
 class State:
     def __init__(self):
         self.memory = {}
@@ -18,6 +19,7 @@ class State:
         self.noderizer = noderizer # alias
         self.tokenizer = tokenizer
         self.evaluator = evaluator
+        self.os = os
         self.error    = error
         self.sp = 0
         self.hp = 0
@@ -45,7 +47,8 @@ class State:
             "tag",
             "untag",
             "getTypeTag",
-            "mallocType"
+            "mallocType",
+            "cmd"
         ]
         self.types = {
             "string": t.string,

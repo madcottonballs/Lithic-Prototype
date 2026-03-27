@@ -127,7 +127,7 @@
 >				printf( input() );
 >				/* This example will display the text the user just entered. */
 
-###		*cmd([string])
+###		cmd([string])
 			Runs the entered string as a command prompt in the terminal.
 ##	Inline:
 ###		*inline_C([string])
@@ -305,6 +305,7 @@
 			Lets the interpreter/compiler know a ptr variable references a specific type.
 			This lets you do ptr derefencing without specifying type everytime.
 			This is totally optional.
+			Only variables of type ptr can be tagged. Not any object holding a ptr, and not any ptr.
 			Ex:
 ```
 				let ptr px = mallocType(i32, 10);   /* allocate space for ten 32 bit signed integers */
