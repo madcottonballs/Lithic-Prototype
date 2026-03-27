@@ -45,7 +45,7 @@ def resolve_let(tokens, i, ltc) -> None:
             empty_array.size = var_type_arg.size
             helper.load_to_mem(ltc, empty_array, "array")
         else:
-            helper.load_to_mem(ltc, helper.recieve_empty_form(t, var_type_arg.val), var_type_arg.val)
+            helper.load_to_mem(ltc, helper.recieve_empty_form(ltc, var_type_arg.val), var_type_arg.val)
     
     if isinstance(var_type_arg, t.array):
         ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
@@ -152,7 +152,7 @@ def resolve_concat(tokens, i, ltc) -> None:
     else: # strings & arrays
         tokens[i] = expected_type(concatenated)
 
-def resolve_cast_function(tokens: list, i: int, ltc):
+def resolve_cast_function(tokens: list, i: int, ltc, return_values, evaluate, execute_source_fn):
     t = ltc.t
     if len(tokens[i].args) != 2:
         raise SyntaxError(f"cast expects exactly two arguments, not {len(tokens[i].args)}")
@@ -160,8 +160,13 @@ def resolve_cast_function(tokens: list, i: int, ltc):
     # readability
     cast_target: str = tokens[i].args[1].val
     source_object: object = tokens[i].args[0]
+    helper = ltc.helper
+    # Resolve nodes so casts work with expressions and @(...) results.
+    source_object = helper.resolve_node(source_object, ltc, return_values, evaluate, execute_source_fn)
+    if isinstance(source_object, ltc.n.at_func_return):
+        source_object = source_object.val
     # only used for integer casts but this avoids rewriting
-    ltc_target_int_class = t.__dict__[cast_target] # finds the ltc typerizer class referenced by the cast_target string (if cast_target = "i32", ltc_target_int_class = t.i32)
+    ltc_target_int_class = ltc.types[cast_target] # finds the ltc typerizer class referenced by the cast_target string (if cast_target = "i32", ltc_target_int_class = t.i32)
 
     # execution
 

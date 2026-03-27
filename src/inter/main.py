@@ -66,6 +66,19 @@ class State:
             "ptr": t.ptr,
             "tuple": t.ltctuple,
         }
+        self.arrayTypes = (
+            "char",
+            "i32",
+            "boolean",
+            "i64",
+            "i8",
+            "i16",
+            "u32",
+            "u64",
+            "u8",
+            "u16",
+            "ptr",
+        )
 
 """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet."""
 def error(ltc, message):

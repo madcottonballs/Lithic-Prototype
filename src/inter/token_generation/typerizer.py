@@ -226,7 +226,7 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
 
             if len(self.val) == 0:
                 for _, v in enumerate(element_types):
-                    self.val += (ltc.helper.recieve_empty_form(ltc.t, v),) # add empty form of each element type to the tuple
+                    self.val += (ltc.helper.recieve_empty_form(ltc, v),) # add empty form of each element type to the tuple
 
         else:
             self.element_types = tuple(type(element).__name__ for element in self.val)

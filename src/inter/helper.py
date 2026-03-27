@@ -323,7 +323,7 @@ def dereference_var(ltc, var_ref_token) -> object:
     t = ltc.t
     match var_type:
         case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
-            class_ref = t.__dict__[var_type]                        # gathers the class reference for the variable type (e.g. t.i32)
+            class_ref = ltc.types[var_type]                        # gathers the class reference for the variable type (e.g. t.i32)
             temp_instance = class_ref(0)                        # create a temporary instance to call read_from_memory
             temp_instance = temp_instance.read_from_memory(ltc.memory, addr)  # read_from_memory returns a typed value
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
@@ -358,15 +358,21 @@ def dereference_var(ltc, var_ref_token) -> object:
             length = var_meta["length"]
             values = []
             match elem_type:
-                case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
+                case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16"|"ptr":
+                    integer_type = ltc.types[elem_type]
                     for index in range(length):
                         element_addr = addr + (index * get_ltc_type_size(elem_type))
                         element_value = int.from_bytes(ltc.memory[element_addr:element_addr + get_ltc_type_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
-                        values.append(t.__dict__[elem_type](element_value))
+                        element = integer_type(element_value)
+                        values.append(element)
                 case "boolean":
                     for index in range(length):
                         element_addr = addr + index
                         values.append(t.boolean(ltc.memory[element_addr] != 0))
+                case "char":
+                    for index in range(length):
+                        element_addr = addr + index
+                        values.append(t.char(chr(ltc.memory[element_addr])))
                 case _:
                     ltc.error(ltc, f"Unsupported array element type: {elem_type}")
 
@@ -417,7 +423,7 @@ def integer_type_to_signedness(type_name: str) -> bool:
     match type_name:
         case "i8"|"i16"|"i32"|"i64":
             return True
-        case "u8"|"u16"|"u32"|"u64":
+        case "u8"|"u16"|"u32"|"u64"|"ptr":
             return False
         case _:
             raise ValueError(f"Unknown integer type: {type_name}")
@@ -496,21 +502,21 @@ def memory_bounds_check(ltc) -> None:
     if ltc.hp <= ltc.sp:
         raise MemoryError("Stack and Heap intersect. Out of memory.")
 
-def recieve_empty_form(t, type):
+def recieve_empty_form(ltc, type):
     """give the name of the type you want, this function returns an empty instance of that type"""
     match type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            return t.__dict__[type](0)
+            return ltc.types[type](0)
         case "string":
-            return t.string("")
+            return ltc.t.string("")
         case "boolean":
-            return t.boolean(False)
+            return ltc.t.boolean(False)
         case "array":
-            return t.array([], None, False)
+            return ltc.t.array([], None, False)
         case "ptr":
-            return t.ptr(0)
+            return ltc.t.ptr(0)
         case "char":
-            return t.char('')
+            return ltc.t.char('')
 
 def locate_var_in_namespace(namespace, var_name, return_just_the_check=True):
     """Search for a variable in the namespace stack and return its metadata and scope level.
@@ -618,5 +624,8 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
         case "ptr":
             return ltc_type(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
         case _:
-            ltc.error(ltc, f"Unsupported type for reading from mem: {type_str}")
+            if type_str in ltc.types: # if we want to add support in the future for more types
+                ltc.error(ltc, f"Type '{type_str}' is supposed to be supported but has no defined behavior for reading from memory. Please implement read behavior for this type in read_ltc_type_from_mem helper function.")
+            else:
+                ltc.error(ltc, f"Unsupported type for reading from mem: {type_str}")
 

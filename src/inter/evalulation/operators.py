@@ -134,16 +134,15 @@ def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_f
             index_val = index_val % array_len
         if index_val >= array_len:
             raise SyntaxError(f"Tried to index an array of size {array_len} with an index of {index_val}")
+        
+        # For arrays, we want to return the element at the index, but we need to make sure to return it as the correct type according to the array's element type. This is because the elements of the array are stored as their raw values (e.g. an i32 array stores the i32 values directly), so when we retrieve an element from the array we need to wrap it in the appropriate ltc_type class (e.g. t.i32) before returning it.
         elem = base.val[index_val]
-        match base.arrayType:
-            case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-                tokens[i] = t.__dict__[base.arrayType](elem.val if hasattr(elem, "val") else elem)
-            case "string":
-                tokens[i] = t.string(elem.val if hasattr(elem, "val") else elem)
-            case "boolean":
-                tokens[i] = t.boolean(elem.val if hasattr(elem, "val") else elem)
-            case _:
-                raise TypeError("Unsupported type of array used for indexing")
+        val = elem.val if hasattr(elem, "val") else elem
+        if base.arrayType in ltc.arrayTypes:
+            tokens[i] = ltc.types[base.arrayType](val)
+        else:
+            raise TypeError("Unsupported type of array used for indexing")
+        
         return
 
     if isinstance(base, t.string):

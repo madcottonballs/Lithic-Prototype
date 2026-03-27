@@ -57,7 +57,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
                 # Do not force all function args to be runtime values here.
                 # `let` intentionally carries identifier/operator tokens through to function_processing.
                 tokens[i].args[arg_idx] = arg_val
-            return_values = function_processing(tokens, i, ltc, return_values)
+            return_values = function_processing(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             if isinstance(tokens[i], t.function) and tokens[i].val == "return":
                 return return_values
 
@@ -89,7 +89,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
 
     return return_values
 
-def function_processing(tokens, i, ltc, return_values) -> list:
+def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_fn) -> list:
     """Process built-ins and return updated stack pointer."""
     t = ltc.t
     helper = ltc.helper
@@ -126,7 +126,7 @@ def function_processing(tokens, i, ltc, return_values) -> list:
             return_values = [tokens[i].args[0]]
         
         case "cast":
-            data.resolve_cast_function(tokens, i, ltc)
+            data.resolve_cast_function(tokens, i, ltc, return_values, evaluate, execute_source_fn)
         
         case "malloc":
             data.resolve_malloc(tokens, i, ltc)
