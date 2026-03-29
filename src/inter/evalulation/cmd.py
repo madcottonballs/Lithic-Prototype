@@ -4,7 +4,7 @@ import os
 def ltc_print(ltc, tokens, i) -> None:
     t = ltc.t
     if len(tokens[i].args) != 1:
-        raise SyntaxError("printf() expects exactly one argument")
+        ltc.error("printf() expects exactly one argument")
     arg = tokens[i].args[0]
     if isinstance(arg, t.integer | t.string | t.boolean | t.char):
         print(arg.val, end="\n")
@@ -17,13 +17,13 @@ def ltc_print(ltc, tokens, i) -> None:
     elif isinstance(arg, t.token) and arg.val in ltc.types:
         print(f"<type {arg.val}>", end="\n")
     else:
-        raise TypeError(f"Unsupported argument type for printf(): {type(arg).__name__}")
-    tokens[i] = t.i32(0)
+        ltc.error(f"Unsupported argument type for printf(): {type(arg).__name__}")
+    tokens[i] = t.i32(0, ltc)
 
 def ltc_input(tokens, i, ltc) -> None:
     t = ltc.t
     if len(tokens[i].args) != 0:
-        raise SyntaxError("input does not take any arguments")
+        ltc.error("input does not take any arguments")
     try:
         tokens[i] = t.string(input())
     except EOFError:
@@ -31,7 +31,7 @@ def ltc_input(tokens, i, ltc) -> None:
 
 def resolve_coredump(tokens, i, ltc) -> None:
     if len(tokens[i].args) != 0:
-        raise SyntaxError("coredump does not take any arguments")
+        ltc.error("coredump does not take any arguments")
     with open("coredump.txt", "w") as f:
         annontations: dict[int, str] = {} # memory annontations keyed by memory address for easier reading of the coredump. This is populated by things like variable declarations that know what memory addresses they are using, and can write those addresses along with variable names and types to the annontations dict. The coredump printing logic then checks this dict when printing each memory address, and if an annotation exists for that address, it prints it along with the memory value.
         f.write("===CORE DUMP===\n")
@@ -79,9 +79,9 @@ def resolve_coredump(tokens, i, ltc) -> None:
 
 def resolve_cmd(tokens, i, ltc) -> None:
     if len(tokens[i].args) != 1:
-        raise SyntaxError("cmd expects exactly one argument")
+        ltc.error("cmd expects exactly one argument")
     arg = tokens[i].args[0]
     if isinstance(arg, ltc.t.string):
-        tokens[i] = ltc.t.i32(ltc.os.system(arg.val))
+        tokens[i] = ltc.t.i32(ltc.os.system(arg.val), ltc)
     else:
-        raise TypeError(f"Unsupported argument type for cmd(): {type(arg).__name__}")
+        ltc.error(f"Unsupported argument type for cmd(): {type(arg).__name__}")

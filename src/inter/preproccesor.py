@@ -8,10 +8,13 @@ def process_imports(source_text: str, ltc) -> str:
     lines = source_text.splitlines()
     processed_lines: list[str] = []
     for line in lines:
+        ltc.current_stmt = line.strip() # for better error messages in the case of an error during import processing
+        
         stripped_line = line.strip()
         if stripped_line.startswith("import "):
             # Extract the module name
-            import_stmt = ltc.tokenizer.import_lexer(stripped_line)
+            stripped_line = ltc.helper.strip_comments(stripped_line, ltc) # strip comments from the import line as well, in case there are any
+            import_stmt = ltc.tokenizer.import_lexer(stripped_line, ltc)
             module_name = import_stmt.module_name
             module_ext = import_stmt.module_ext
             module_alias = import_stmt.alias or module_name
@@ -24,7 +27,7 @@ def process_imports(source_text: str, ltc) -> str:
                     with open(f"{ltc.STDLIB_PATH}\\{module_name}.{module_ext}", "r") as f:
                         module_source = f.read()
                 except FileNotFoundError:
-                    raise Exception(f"Module {module_name}.{module_ext} not found. Tried checking stdlib under: '{ltc.STDLIB_PATH}\\{module_name}.{module_ext}', but also couldn't find it.")
+                    ltc.error(f"Module {module_name}.{module_ext} not found. Tried checking stdlib under: '{ltc.STDLIB_PATH}\\{module_name}.{module_ext}', but also couldn't find it.")
 
             # Recursively process imports in the module source
             processed_module_source = process_imports(module_source, ltc)

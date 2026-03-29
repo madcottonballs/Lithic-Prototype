@@ -20,7 +20,6 @@ class State:
         self.tokenizer = tokenizer
         self.evaluator = evaluator
         self.os = os
-        self.error    = error
         self.sp = 0
         self.hp = 0
         self.raw_source = ""
@@ -82,15 +81,15 @@ class State:
             "u16",
             "ptr",
         )
-
-def error(ltc, message):
-    """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet.*"""
-    print("Traceback (most recent call last):")
-    for i, v in enumerate(reversed(ltc.traceback)):
-        print(f"In {v}( ... )")
-    print(f"Line: '{ltc.current_stmt}'")
-    print(f"Lithic Error: {message}")
-    exit(1)
+    def error(self, message):
+        """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet*"""
+        print("Lithic Traceback (most recent call last):")
+        for i, v in enumerate(self.traceback):
+            print(f"In {v}( ... )")
+        print(f"Line: '{self.current_stmt}'")
+        #print(f"Lithic Error: {message}")
+        raise RuntimeError(message) # * temporary during development; will implement more sophisticated error handling later
+        #exit(1)
 
 def execute_statement(stmt: str, ltc, return_values) -> list:
     """Execute one non-control-flow statement and return return_values."""
@@ -113,7 +112,7 @@ def evaluate_condition(condition_expr: str, ltc: State) -> bool:
     evaluator.evaluate(tokens, ltc, [], execute_source)
 
     if len(tokens) != 1:
-        raise SyntaxError("condition must reduce to a single value")
+        ltc.error("condition must reduce to a single value")
 
     value = tokens[0]
     if isinstance(value, t.boolean):
@@ -122,9 +121,9 @@ def evaluate_condition(condition_expr: str, ltc: State) -> bool:
         return value.val != 0
     if isinstance(value, t.string):
         return len(value.val) > 0
-    raise TypeError(f"Unsupported condition type: {type(value)}")
+    ltc.error(f"Unsupported condition type: {type(value)}")
 
-def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, list[str], list[str], str, int]:
+def _parse_function_declaration(source_text: str, def_index: int, ltc: State) -> tuple[str, list[str], list[str], str, int]:
     """Parse `define name(type arg, ...) { ... }`.
 
     Returns: (function_name, arg_types, arg_names, function_body_source, next_cursor_after_block)
@@ -132,7 +131,7 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
     keyword = "define"
     name_start = helper.skip_whitespace(source_text, def_index + len(keyword))
     if name_start >= len(source_text):
-        raise SyntaxError("Expected function name after define")
+        ltc.error("Expected function name after define")
 
     name_end = name_start
     while name_end < len(source_text) and (
@@ -142,13 +141,13 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
 
     function_name = source_text[name_start:name_end].strip()
     if not function_name:
-        raise SyntaxError("Expected function name after define")
+        ltc.error("Expected function name after define")
 
     header_open_index = helper.skip_whitespace(source_text, name_end)
     if header_open_index >= len(source_text) or source_text[header_open_index] != "(":
-        raise SyntaxError(f"Expected '(' after function name, instead got '{source_text[header_open_index]}'")
+        ltc.error(f"Expected '(' after function name, instead got '{source_text[header_open_index]}'")
 
-    header_close_index = helper.find_matching(source_text, header_open_index, "(", ")")
+    header_close_index = helper.find_matching(source_text, header_open_index, "(", ")", ltc)
     header_text = source_text[header_open_index + 1:header_close_index].strip()
 
     arg_types: list[str] = []
@@ -158,18 +157,18 @@ def _parse_function_declaration(source_text: str, def_index: int) -> tuple[str, 
         for arg_decl in header_parts:
             arg_decl = arg_decl.strip()
             if not arg_decl:
-                raise SyntaxError("Empty argument declaration in function header")
+                ltc.error("Empty argument declaration in function header")
             pieces = arg_decl.split()
             if len(pieces) != 2:
-                raise SyntaxError("Invalid argument declaration in function header")
+                ltc.error("Invalid argument declaration in function header")
             arg_types.append(pieces[0])
             arg_names.append(pieces[1])
 
     block_open_index = helper.skip_whitespace(source_text, header_close_index + 1)
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
-        raise SyntaxError("Expected '{' after function header")
+        ltc.error("Expected '{' after function header")
 
-    block_close_index = helper.find_matching(source_text, block_open_index, "{", "}")
+    block_close_index = helper.find_matching(source_text, block_open_index, "{", "}", ltc)
     function_body = source_text[block_open_index + 1:block_close_index]
 
     return function_name, arg_types, arg_names, function_body, block_close_index + 1
@@ -178,7 +177,7 @@ def execute_source(source, ltc: State, return_values) -> list:
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
     \n Returns return value(s) if executing a function body"""
     
-    source_text = helper.strip_comments(source)
+    source_text = helper.strip_comments(source, ltc)
     source_text = preproccesor.process_imports(source_text, ltc)
     ltc.current_source = source_text
     cursor = 0
@@ -191,7 +190,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             break
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "define", get_paren=False):
-            function_name, arg_types, arg_names, function_body, next_cursor = _parse_function_declaration(source_text, cursor)
+            function_name, arg_types, arg_names, function_body, next_cursor = _parse_function_declaration(source_text, cursor, ltc)
             ltc.user_functions[function_name] = {
                 "arg_types": arg_types,
                 "arg_names": arg_names,
@@ -201,7 +200,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             continue
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "while"):
-            condition_expression, block_source, next_cursor = helper.parse_while_block(source_text, cursor)
+            condition_expression, block_source, next_cursor = helper.parse_while_block(source_text, cursor, ltc)
 
             condition_true = evaluate_condition(condition_expression, ltc)
             while condition_true:
@@ -214,7 +213,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             continue
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "iterate"):
-            iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor)
+            iterator_name, end_value, block_source, next_cursor = helper.parse_iterate_block(source_text, cursor, ltc)
 
             helper.create_frame(ltc)
             return_values = execute_statement(f"let i32 {iterator_name} = 0", ltc, return_values)
@@ -234,7 +233,7 @@ def execute_source(source, ltc: State, return_values) -> list:
             continue
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "for"):
-            init_statement, condition_expression, step_statement, block_source, next_cursor = helper.parse_for_block(source_text, cursor)
+            init_statement, condition_expression, step_statement, block_source, next_cursor = helper.parse_for_block(source_text, cursor, ltc)
 
             helper.create_frame(ltc)
             return_values = execute_statement(init_statement, ltc, return_values)
@@ -252,14 +251,14 @@ def execute_source(source, ltc: State, return_values) -> list:
             continue
 
         if helper.is_controlflow_keyword_at(source_text, cursor, "if"):
-            condition_expression, if_block_source, next_cursor = helper.parse_if_block(source_text, cursor)
+            condition_expression, if_block_source, next_cursor = helper.parse_if_block(source_text, cursor, ltc)
             condition_true = evaluate_condition(condition_expression, ltc)
 
             else_cursor = helper.skip_whitespace(source_text, next_cursor)
             has_else = helper.is_controlflow_keyword_at(source_text, else_cursor, "else")
 
             if has_else:
-                else_block_source, after_else_cursor = helper.parse_else_block(source_text, else_cursor)
+                else_block_source, after_else_cursor = helper.parse_else_block(source_text, else_cursor, ltc)
                 if condition_true:
                     helper.create_frame(ltc)
                     return_values = execute_source(if_block_source, ltc, return_values)
@@ -299,7 +298,7 @@ def main(raw_source: str, memory_size: int=1024) -> int:
     return_values = []
     return_values= execute_source(ltc.raw_source, ltc, return_values)
     if return_values == None:
-        raise RuntimeError("Program did not return a value")
+        ltc.error("Program did not return a value")
     return return_values[0] if len(return_values) == 1 else return_values
 
 

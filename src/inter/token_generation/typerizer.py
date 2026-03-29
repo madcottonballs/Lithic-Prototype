@@ -36,13 +36,14 @@ class boolean(ltc_type):
         return bool(int.from_bytes(memory[addr], byteorder='little', signed=False))
 
 class array(ltc_type):
-    def __init__(self, val, arrayType=None, parse=True):
+    def __init__(self, val, ltc, arrayType=None, parse=True):
         super().__init__(val)
         self.arrayType = arrayType
         self.parsed = not parse
+        self.ltc = ltc
         if parse:
-            self.parse()
-    def parse(self):
+            self.parse(ltc)
+    def parse(self, ltc):
         """Turns raw tokens between square brackets stored in self.val to a list of just the elements of the array obj\n
         Ex:
             'self.val == [element, comma, element]' -> 'self.val == [element, element]'"""
@@ -62,17 +63,17 @@ class array(ltc_type):
         # Single-element array literal: [x]
         if len(self.val) == 1:
             if type(self.val[0]).__name__ != self.arrayType:
-                raise TypeError(f"Expected array literal element type '{self.arrayType}', but found '{type(self.val[0]).__name__}'")
+                ltc.error(f"Expected array literal element type '{self.arrayType}', but found '{type(self.val[0]).__name__}'")
             self.parsed = True
             return
 
         for i, element in enumerate(self.val):
             if i % 2 == 1: # comma expected
                 if not (isinstance(element, token) and element.val == ","):
-                    raise SyntaxError("Expected ',' between elements in array literal creation")
+                    ltc.error("Expected ',' between elements in array literal creation")
             else: # element expected
                 if type(element).__name__ != self.arrayType:
-                    raise TypeError(f"Expected all elements of array literal decleration to be type '{self.arrayType}', but found '{type(element).__name__}'")
+                    ltc.error(f"Expected all elements of array literal decleration to be type '{self.arrayType}', but found '{type(element).__name__}'")
 
         self.val = [element for i, element in enumerate(self.val) if i % 2 == 0]
         self.parsed = True
@@ -80,16 +81,16 @@ class array(ltc_type):
     def get_size(self):
         declared_size = getattr(self, "size", None)
         if declared_size is None:
-            self.parse() # ensures .val is the parsed form
+            self.parse(self.ltc) # ensures .val is the parsed form
             self.size = len(self.val)
         return self.size
 
 class function(token):
-    def __init__(self, name: str, args: list[token]):
+    def __init__(self, name: str, args: list[token], ltc):
         self.val = name
         self.args = args
-        self.process_args()
-    def process_args(self):
+        self.process_args(ltc)
+    def process_args(self, ltc):
         if self.val == "let":
             # Intended syntax path: let i32 x = 5
             if len(self.args) == 4:
@@ -101,7 +102,7 @@ class function(token):
             if len(self.args) > 1:
                 for i, arg in enumerate(self.args):
                     if i % 2 == 1 and not (isinstance(arg, token) and arg.val == ","):
-                        raise ValueError("Expected ',' between function arguments")
+                        ltc.error("Expected ',' between function arguments")
                 self.args = [arg for i, arg in enumerate(self.args) if i % 2 == 0]
                 return
 
@@ -110,7 +111,7 @@ class function(token):
             if not any(isinstance(arg, token) and arg.val == "," for arg in self.args):
                 # If raw tokens remain without commas, this is still a syntax error.
                 if any(isinstance(arg, token) for arg in self.args):
-                    raise ValueError("Expected ',' between function arguments.")
+                    ltc.error("Expected ',' between function arguments.")
                 return
             
             # For multiple args the expected shape is:
@@ -118,7 +119,7 @@ class function(token):
             for i, arg in enumerate(self.args):
                 if i % 2 == 1:
                     if not (isinstance(arg, token) and arg.val == ","):
-                        raise ValueError("Expected ',' between function arguments. This error also occurs if you didn't put commas between arguments, or if each argument doesn't resolve to one object. Try moving any operations inside arguments to seperate lines.")
+                        ltc.error("Expected ',' between function arguments. This error also occurs if you didn't put commas between arguments, or if each argument doesn't resolve to one object. Try moving any operations inside arguments to seperate lines.")
 
             # Keep only actual argument positions and drop commas.
             self.args = [arg for i, arg in enumerate(self.args) if i % 2 == 0]
@@ -126,8 +127,9 @@ class function(token):
 # integer types are all stored as the same integer node, but can be tagged with their specific type for type checking purposes.
 
 class integer(ltc_type):
-    def __init__(self, val):
+    def __init__(self, val, ltc):
         super().__init__(val)
+        self.ltc = ltc
         # Store numeric literals as numbers, not strings.
         if isinstance(val, str):
             self.val = int(val)
@@ -141,7 +143,7 @@ class integer(ltc_type):
         memory[addr:addr + self.size] = self.val.to_bytes(self.size, byteorder='little', signed=self.signed)
     def read_from_memory(self, memory, addr):
         return int.from_bytes(memory[addr:addr + self.size], byteorder='little', signed=self.signed)
-    def int_bounds_check(self):
+    def int_bounds_check(self, ltc):
         if self.signed:
             self.min_val = -(2 ** (self.size * 8 - 1))
             self.max_val = (2 ** (self.size * 8 - 1)) - 1
@@ -150,77 +152,77 @@ class integer(ltc_type):
             self.max_val = (2 ** (self.size * 8)) - 1
 
         if not ((self.min_val) <= (self.val) <= (self.max_val)):
-            raise OverflowError(f"Integer '{self.val}' exceeds the range of type with size {self.size} bytes and signed={self.signed}")
+            ltc.error(f"Integer '{self.val}' exceeds the range of type with size {self.size} bytes and signed={self.signed}")
 class i32(integer): # i32
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = True
         self.size = 4
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return i32(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return i32(super().read_from_memory(memory, addr), ltc)
 class i64(integer): # i64
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = True
         self.size = 8
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return i64(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return i64(super().read_from_memory(memory, addr), ltc)
 class i16(integer): # i16
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = True
         self.size = 2
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return i16(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return i16(super().read_from_memory(memory, addr), ltc)
 class i8(integer): # i8
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = True
         self.size = 1
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return i8(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return i8(super().read_from_memory(memory, addr), ltc)
 class u32(integer): # u32
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = False
         self.size = 4
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return u32(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return u32(super().read_from_memory(memory, addr), ltc)
 class u64(integer): # u64
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = False
         self.size = 8
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return u64(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return u64(super().read_from_memory(memory, addr), ltc)
 class u8(integer): # u8
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = False
         self.size = 1
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return u8(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return u8(super().read_from_memory(memory, addr), ltc)
 class u16(integer): # u16
-    def __init__(self, val):
-        super().__init__(val)
+    def __init__(self, val, ltc):
+        super().__init__(val, ltc)
         self.signed = False
         self.size = 2
-        self.int_bounds_check()
-    def read_from_memory(self, memory, addr):
-        return u16(super().read_from_memory(memory, addr))
+        self.int_bounds_check(ltc)
+    def read_from_memory(self, memory, addr, ltc):
+        return u16(super().read_from_memory(memory, addr), ltc)
 class ptr(u64): # ptr (64-bit unsigned integer representing a memory address)
-    def __init__(self, val, var_name=None):
-        super().__init__(val)
+    def __init__(self, val, ltc, var_name=None):
+        super().__init__(val, ltc)
         self.var_name = var_name  # Optional metadata to track what variable this pointer is associated with, for tag().
-    def read_from_memory(self, memory, addr):
-        return ptr(super().read_from_memory(memory, addr).val, var_name=self.var_name) # preserve var_name metadata if present
+    def read_from_memory(self, memory, addr, ltc):
+        return ptr(super().read_from_memory(memory, addr, ltc).val, ltc, var_name=self.var_name) # preserve var_name metadata if present
 
 class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable elements,
     def __init__(self, ltc, elements: tuple=(), element_types: list[str]=None):
@@ -235,15 +237,15 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
 
         else:
             self.element_types = tuple(type(element).__name__ for element in self.val)
-    def load_to_memory(self, memory, addr):
+    def load_to_memory(self, memory, addr, ltc):
         # For simplicity, we will store tuples in memory as a contiguous block of their elements' byte representations.
         current_addr = addr # current_addr will track where we are in memory as we store each element of the tuple
         for element in self.val:
-            if type(element).__name__ in ["i32", "i64", "i16", "i8", "u32", "u64", "u16", "u8", "char", "boolean", "ptr"]: # only support storing primitive types in tuples for now
+            if type(element).__name__ in ltc.primitives: # only support storing primitive types in tuples for now
                 element.load_to_memory(memory, current_addr)
                 current_addr += element.size
             else:
-                raise TypeError(f"Unsupported tuple element type '{type(element).__name__}' for memory storage")
+                ltc.error(f"Unsupported tuple element type '{type(element).__name__}' for memory storage")
         self.inmemory = True
         self.memloc = addr
     @staticmethod
@@ -270,12 +272,12 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         expected_type = element_types[element_index]
 
         if element_index < 0 or element_index >= len(element_types):
-            raise IndexError(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
+            ltc.error(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
         if type_of_new_value != expected_type:
-            raise TypeError(f"Expected new value of type '{expected_type}' for tuple element at index {element_index}, but got type '{type_of_new_value}'")
+            ltc.error(f"Expected new value of type '{expected_type}' for tuple element at index {element_index}, but got type '{type_of_new_value}'")
         
         # Calculate the memory address of the specific tuple element we want to update. This will depend on the sizes of the preceding elements in the tuple.
-        element_offset = sum(helper.get_ltc_type_size(t) for t in element_types[:element_index])
+        element_offset = sum(helper.get_ltc_type_size(t, ltc) for t in element_types[:element_index])
         element_addr = base_addr + element_offset
         # Write the new value to memory at the calculated address.
         new_value.load_to_memory(ltc.memory, element_addr)
@@ -286,10 +288,10 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         helper = ltc.helper
 
         if element_index < 0 or element_index >= len(element_types):
-            raise IndexError(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
+            ltc.error(f"Tuple index {element_index} out of range for tuple with {len(element_types)} elements")
         
         # Calculate the memory address of the specific tuple element we want to read. This will depend on the sizes of the preceding elements in the tuple.
-        element_offset = sum(helper.get_ltc_type_size(t) for t in element_types[:element_index])
+        element_offset = sum(helper.get_ltc_type_size(t, ltc) for t in element_types[:element_index])
         element_addr = memloc + element_offset
         # Read the value from memory at the calculated address and return it as an LTC type object.
         return helper.read_ltc_type_from_mem(ltc.memory, element_addr, element_types[element_index], ltc)
@@ -302,33 +304,33 @@ class ltctuple(ltc_type): # heterogeneous fixed-length tuple type with mutable e
         for i, element in enumerate(self.val):
             if index is not None and i >= index:
                 break
-            total_size += helper.get_ltc_type_size(type(element).__name__)
+            total_size += helper.get_ltc_type_size(type(element).__name__, ltc)
         return total_size
     
 class var_ref(token):
     pass
 
 class user_function():
-    def __init__(self, func_name: str, arguments: list):
+    def __init__(self, func_name: str, arguments: list, ltc):
         self.val = func_name
         self.arguments = arguments
-        self.process_args()
+        self.process_args(ltc)
 
-    def process_args(self):
+    def process_args(self, ltc):
         if len(self.arguments) > 1:
             # For multiple args the expected shape is:
             # arg0, ",", arg1, ",", arg2, ...
             for i, arg in enumerate(self.arguments):
                 if i % 2 == 1:
                     if not (isinstance(arg, token) and arg.val == ","):
-                        raise ValueError("Expected ',' between function arguments")
+                        ltc.error("Expected ',' between function arguments")
 
             # Keep only actual argument positions and drop commas.
             self.arguments = [arg for i, arg in enumerate(self.arguments) if i % 2 == 0]
 
-    def validate_args(self, user_functions):
+    def validate_args(self, user_functions, ltc):
         if self.val not in user_functions:
-            raise NameError(f"Function '{self.val}' is not declared")
+            ltc.error(f"Function '{self.val}' is not declared")
 
         entry = user_functions[self.val]
         if isinstance(entry, dict):
@@ -337,12 +339,10 @@ class user_function():
             # Backward compatibility with old shape: [arg_types, body]
             expected_arg_types = entry[0]
         else:
-            raise TypeError(f"Invalid function metadata for '{self.val}'")
+            ltc.error(f"Invalid function metadata for '{self.val}'")
 
         if len(expected_arg_types) != len(self.arguments):
-            raise SyntaxError(
-                f"Function '{self.val}' expected {len(expected_arg_types)} arguments, but got {len(self.arguments)}"
-            )
+            ltc.error(f"Function '{self.val}' expected {len(expected_arg_types)} arguments, but got {len(self.arguments)}")
 
         for i, expected_type_name in enumerate(expected_arg_types):
             actual_arg = self.arguments[i]
@@ -355,7 +355,7 @@ class user_function():
                 actual_type_name = f"{actual_arg.arrayType}[{actual_arg.get_size()}]"
 
             if actual_type_name != expected_type_name:
-                raise TypeError(
+                ltc.error(
                     f"Function '{self.val}' expected argument {i+1} to be type '{expected_type_name}', "
                     f"but got '{actual_type_name}'"
                 )
@@ -430,7 +430,7 @@ def parser(tokens, ltc): # tokens is not always ltc.tokens
 
         # If all characters were digits, convert token to numeric node.
         if is_int:
-            tokens[token_index] = default_int(token_text)
+            tokens[token_index] = default_int(token_text, ltc)
         
         # Default case: leave unknown identifiers/symbols as generic token nodes.
         if isinstance(tokens[token_index], str):

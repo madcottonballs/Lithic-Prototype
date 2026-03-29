@@ -31,7 +31,7 @@ def resolve_node(node, ltc, return_values, evaluate, execute_source_fn):
 
 
 # helper function for parser: finds the closing parenthesis for a given opening parenthesis index, and replaces the full "(...)" slice with one `subexp` node containing the inner tokens.
-def find_closing_parenthesis(IdxOfOpening, tokens, subexp_cls):
+def find_closing_parenthesis(IdxOfOpening, tokens, subexp_cls, ltc):
     # Start scanning just after the opening parenthesis.
     i = IdxOfOpening + 1
     # Tracks nested parentheses depth inside this sub-expression.
@@ -62,13 +62,13 @@ def find_closing_parenthesis(IdxOfOpening, tokens, subexp_cls):
                 i += 1
     else:
         # We exhausted tokens without finding a matching ")".
-        raise ValueError("No closing bracket found for opening bracket")
+        ltc.error("No closing bracket found for opening bracket")
 
 # helper function for generate_tree: checks that a binary operator at index `i` has both left and right operands, otherwise raises an error.
-def validate_operator(tokens, i, char):
+def validate_operator(tokens, i, char, ltc):
     # Every binary operator must have both left and right operands.
     if i + 1 >= len(tokens) or i - 1 < 0:
-        raise IndexError(f"'{char}' is at the start or end of the expression")
+        ltc.error(f"'{char}' is at the start or end of the expression")
 
 def add_string_to_memory(string, memory, ltc) -> None:
     """Returns the new stack pointer after writing the string to memory.
@@ -86,7 +86,7 @@ def add_string_to_heap(string, memory, ltc, capacity: int | None = None) -> tupl
     alloc = max(needed, capacity or needed)
     start = ltc.hp - alloc
     if start <= ltc.sp:
-        raise MemoryError("Stack and Heap intersect. Out of memory.")
+        ltc.error("Stack and Heap intersect. Out of memory.")
     string.inmemory = True
     string.memloc = start
     # Zero-fill the allocation, then write the string bytes.
@@ -95,7 +95,7 @@ def add_string_to_heap(string, memory, ltc, capacity: int | None = None) -> tupl
     ltc.hp = start
     return start, alloc
 
-def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str) -> int:
+def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str, ltc) -> int:
     """Return index of the closing delimiter matching opening_index.
 
     This matcher is nesting-aware and ignores delimiters inside quoted strings.
@@ -126,7 +126,7 @@ def find_matching(source_text: str, opening_index: int, opening_char: str, closi
                     return cursor
         cursor += 1
 
-    raise SyntaxError(f"Unmatched '{opening_char}'")
+    ltc.error(f"Unmatched '{opening_char}'")
 
 def skip_whitespace(source_text: str, start_index: int) -> int:
     """Advance cursor over whitespace and return the first non-whitespace index."""
@@ -159,7 +159,7 @@ def is_controlflow_keyword_at(source_text: str, cursor: int, keyword: str, get_p
 
     return left_ok and right_ok
 
-def parse_control_block(source_text: str, keyword_index: int, keyword: str) -> tuple[str, str, int]:
+def parse_control_block(source_text: str, keyword_index: int, keyword: str, ltc) -> tuple[str, str, int]:
     """Parse `<keyword> (<condition>) { <block> }` and return condition/body/next index.
 
     Returns: (condition_expression, block_source, next_cursor_after_block)
@@ -168,42 +168,42 @@ def parse_control_block(source_text: str, keyword_index: int, keyword: str) -> t
     # 1) Find the start of the condition: if ( ... )
     condition_open_index = skip_whitespace(source_text, keyword_index + keyword_len)
     if condition_open_index >= len(source_text) or source_text[condition_open_index] != "(":
-        raise SyntaxError(f"Expected '(' after {keyword}")
+        ltc.error(f"Expected '(' after {keyword}")
 
     # 2) Extract raw condition text between matching parentheses.
-    condition_close_index = find_matching(source_text, condition_open_index, "(", ")")
+    condition_close_index = find_matching(source_text, condition_open_index, "(", ")", ltc)
     condition_expression = source_text[condition_open_index + 1:condition_close_index]
 
     # 3) Find the start of the block body: { ... }
     block_open_index = skip_whitespace(source_text, condition_close_index + 1)
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
-        raise SyntaxError(f"Expected '{{' after {keyword} condition")
+        ltc.error(f"Expected '{{' after {keyword} condition")
 
     # 4) Extract block source between matching curly braces.
-    block_close_index = find_matching(source_text, block_open_index, "{", "}")
+    block_close_index = find_matching(source_text, block_open_index, "{", "}", ltc)
     block_source = source_text[block_open_index + 1:block_close_index]
 
     # Return parsed parts plus the next cursor position after the block.
     return condition_expression, block_source, block_close_index + 1
 
-def parse_else_block(source_text: str, else_index: int) -> tuple[str, int]:
+def parse_else_block(source_text: str, else_index: int, ltc) -> tuple[str, int]:
     """Parse `else { <block> }` and return block source plus next cursor index."""
     keyword = "else"
     block_open_index = skip_whitespace(source_text, else_index + len(keyword))
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
-        raise SyntaxError("Expected '{' after else")
+        ltc.error("Expected '{' after else")
 
-    block_close_index = find_matching(source_text, block_open_index, "{", "}")
+    block_close_index = find_matching(source_text, block_open_index, "{", "}", ltc)
     block_source = source_text[block_open_index + 1:block_close_index]
     return block_source, block_close_index + 1
 
-def parse_if_block(source_text: str, if_index: int) -> tuple[str, str, int]:
+def parse_if_block(source_text: str, if_index: int, ltc) -> tuple[str, str, int]:
     """Parse `if (<condition>) { <block> }` starting at if_index."""
-    return parse_control_block(source_text, if_index, "if")
+    return parse_control_block(source_text, if_index, "if", ltc)
 
-def parse_while_block(source_text: str, while_index: int) -> tuple[str, str, int]:
+def parse_while_block(source_text: str, while_index: int, ltc) -> tuple[str, str, int]:
     """Parse `while (<condition>) { <block> }` starting at while_index."""
-    return parse_control_block(source_text, while_index, "while")
+    return parse_control_block(source_text, while_index, "while", ltc)
 
 def _split_top_level_commas(text: str) -> list[str]:
     """Split by commas that are not nested in parentheses/braces/brackets or strings."""
@@ -250,7 +250,7 @@ def _split_top_level_commas(text: str) -> list[str]:
     parts.append(text[start:].strip())
     return parts
 
-def parse_for_block(source_text: str, for_index: int) -> tuple[str, str, str, str, int]:
+def parse_for_block(source_text: str, for_index: int, ltc) -> tuple[str, str, str, str, int]:
     """Parse `for (init, condition, step) { block }`.
 
     Returns: (init_statement, condition_expression, step_statement, block_source, next_cursor_after_block)
@@ -258,13 +258,13 @@ def parse_for_block(source_text: str, for_index: int) -> tuple[str, str, str, st
     keyword = "for"
     header_open_index = skip_whitespace(source_text, for_index + len(keyword))
     if header_open_index >= len(source_text) or source_text[header_open_index] != "(":
-        raise SyntaxError("Expected '(' after for")
+        ltc.error("Expected '(' after for")
 
-    header_close_index = find_matching(source_text, header_open_index, "(", ")")
+    header_close_index = find_matching(source_text, header_open_index, "(", ")", ltc)
     header_text = source_text[header_open_index + 1:header_close_index]
     header_parts = _split_top_level_commas(header_text)
     if len(header_parts) != 3:
-        raise SyntaxError("for expects exactly 3 header expressions: init, condition, step")
+        ltc.error("for expects exactly 3 header expressions: init, condition, step")
 
     init_statement = header_parts[0]
     condition_expression = header_parts[1]
@@ -272,14 +272,14 @@ def parse_for_block(source_text: str, for_index: int) -> tuple[str, str, str, st
 
     block_open_index = skip_whitespace(source_text, header_close_index + 1)
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
-        raise SyntaxError("Expected '{' after for header")
+        ltc.error("Expected '{' after for header")
 
-    block_close_index = find_matching(source_text, block_open_index, "{", "}")
+    block_close_index = find_matching(source_text, block_open_index, "{", "}", ltc)
     block_source = source_text[block_open_index + 1:block_close_index]
 
     return init_statement, condition_expression, step_statement, block_source, block_close_index + 1
 
-def parse_iterate_block(source_text: str, iterate_index: int) -> tuple[str, int, str, int]:
+def parse_iterate_block(source_text: str, iterate_index: int, ltc) -> tuple[str, int, str, int]:
     """Parse `iterate (<var_name>, <end_dword>) { block }`.
 
     Returns: (iterator_name, end_value, block_source, next_cursor_after_block)
@@ -287,31 +287,31 @@ def parse_iterate_block(source_text: str, iterate_index: int) -> tuple[str, int,
     keyword = "iterate"
     header_open_index = skip_whitespace(source_text, iterate_index + len(keyword))
     if header_open_index >= len(source_text) or source_text[header_open_index] != "(":
-        raise SyntaxError("Expected '(' after iterate")
+        ltc.error("Expected '(' after iterate")
 
-    header_close_index = find_matching(source_text, header_open_index, "(", ")")
+    header_close_index = find_matching(source_text, header_open_index, "(", ")", ltc)
     header_text = source_text[header_open_index + 1:header_close_index]
     header_parts = _split_top_level_commas(header_text)
     if len(header_parts) != 2:
-        raise SyntaxError("iterate expects exactly 2 values: iterate(<var_name>, <end_dword>)")
+        ltc.error("iterate expects exactly 2 values: iterate(<var_name>, <end_dword>)")
 
     iterator_name = header_parts[0].strip()
     if not iterator_name or not (iterator_name[0].isalpha() or iterator_name[0] == "_"):
-        raise SyntaxError("iterate first value must be a valid variable name")
+        ltc.error("iterate first value must be a valid variable name")
     if not all(ch.isalnum() or ch == "_" for ch in iterator_name):
-        raise SyntaxError("iterate variable name contains invalid characters")
+        ltc.error("iterate variable name contains invalid characters")
 
     end_text = header_parts[1].strip()
     #if not end_text.isdigit():
-    #    raise SyntaxError("iterate second value must be a i32 literal")
+    #    ltc.error("iterate second value must be a i32 literal")
     #end_value = int(end_text)
     end_value = end_text
 
     block_open_index = skip_whitespace(source_text, header_close_index + 1)
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
-        raise SyntaxError("Expected '{' after iterate header")
+        ltc.error("Expected '{' after iterate header")
 
-    block_close_index = find_matching(source_text, block_open_index, "{", "}")
+    block_close_index = find_matching(source_text, block_open_index, "{", "}", ltc)
     block_source = source_text[block_open_index + 1:block_close_index]
 
     return iterator_name, end_value, block_source, block_close_index + 1
@@ -349,8 +349,8 @@ def dereference_var(ltc, var_ref_token) -> object:
     match var_type:
         case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16":
             class_ref = ltc.types[var_type]                        # gathers the class reference for the variable type (e.g. t.i32)
-            temp_instance = class_ref(0)                        # create a temporary instance to call read_from_memory
-            temp_instance = temp_instance.read_from_memory(ltc.memory, addr)  # read_from_memory returns a typed value
+            temp_instance = class_ref(0, ltc)                        # create a temporary instance to call read_from_memory
+            temp_instance = temp_instance.read_from_memory(ltc.memory, addr, ltc)  # read_from_memory returns a typed value
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
@@ -373,8 +373,8 @@ def dereference_var(ltc, var_ref_token) -> object:
             temp_instance.memloc = addr                       # store the memory address in the temp instance (used for memloc oper)
             return temp_instance
         case "ptr":
-            temp_instance = t.ptr(0, var_name=var_ref_token.val)                          # create a temporary instance to call read_from_memory
-            temp_instance = temp_instance.read_from_memory(ltc.memory, addr)
+            temp_instance = t.ptr(0, ltc, var_name=var_ref_token.val)                          # create a temporary instance to call read_from_memory
+            temp_instance = temp_instance.read_from_memory(ltc.memory, addr, ltc)
             temp_instance.inmemory = True                     # mark as inmemory (used for memloc oper)
             temp_instance.memloc = addr                       # store the memory address (used for memloc oper)
             return temp_instance
@@ -386,9 +386,9 @@ def dereference_var(ltc, var_ref_token) -> object:
                 case "i32"|"i64"|"i8"|"i16"|"u32"|"u64"|"u8"|"u16"|"ptr":
                     integer_type = ltc.types[elem_type]
                     for index in range(length):
-                        element_addr = addr + (index * get_ltc_type_size(elem_type))
-                        element_value = int.from_bytes(ltc.memory[element_addr:element_addr + get_ltc_type_size(elem_type)], byteorder='little', signed=integer_type_to_signedness(elem_type))
-                        element = integer_type(element_value)
+                        element_addr = addr + (index * get_ltc_type_size(elem_type, ltc))
+                        element_value = int.from_bytes(ltc.memory[element_addr:element_addr + get_ltc_type_size(elem_type, ltc)], byteorder='little', signed=integer_type_to_signedness(elem_type, ltc))
+                        element = integer_type(element_value, ltc)
                         values.append(element)
                 case "boolean":
                     for index in range(length):
@@ -399,9 +399,9 @@ def dereference_var(ltc, var_ref_token) -> object:
                         element_addr = addr + index
                         values.append(t.char(chr(ltc.memory[element_addr])))
                 case _:
-                    ltc.error(ltc, f"Unsupported array element type: {elem_type}")
+                    ltc.error(f"Unsupported array element type: {elem_type}")
 
-            array_obj = t.array(values, arrayType=elem_type, parse=False)
+            array_obj = t.array(values, ltc, arrayType=elem_type, parse=False)
             array_obj.size = length
             array_obj.inmemory = True                     # mark the array object as inmemory (used for memloc oper)
             array_obj.memloc = addr                       # store the memory address in the array object (used for memloc oper)
@@ -410,14 +410,9 @@ def dereference_var(ltc, var_ref_token) -> object:
             element_types = var_meta["element_types"]
             return t.ltctuple.read_from_memory(addr, element_types, ltc) # returns the ltctuple obj
         case _:
-            ltc.error(ltc, f"Unsupported variable type: {var_type}")
+            ltc.error(f"Unsupported variable type: {var_type}")
 
-# decremented, use get_ltc_type_size instead for all type size needs to ensure consistency and avoid bugs where integer type sizes are mismatched across different helper functions
-def integer_type_to_size(type_name: str) -> int:
-    """Helper function to get the byte size of an integer type."""
-    raise DeprecationWarning("integer_type_to_size is deprecated, use get_ltc_type_size instead for all type size needs to ensure consistency")
-
-def get_ltc_type_size(type_name: str) -> int:
+def get_ltc_type_size(type_name: str, ltc) -> int:
     """Helper function to get the byte size of any LTC type."""
     match type_name:
         case "i8"|"u8"|"char"|"boolean":
@@ -429,11 +424,11 @@ def get_ltc_type_size(type_name: str) -> int:
         case "i64"|"u64"|"ptr":
             return 8
         case "string" | "array" | "tuple" | "ltctuple":
-            raise ValueError(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
+            ltc.error(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
         case _:
-            raise ValueError(f"Unknown LTC type: {type_name}")
+            ltc.error(f"Unknown LTC type: {type_name}")
 
-def integer_type_to_signedness(type_name: str) -> bool:
+def integer_type_to_signedness(type_name: str, ltc) -> bool:
     """Helper function to determine if an integer type is signed."""
     match type_name:
         case "i8"|"i16"|"i32"|"i64":
@@ -441,7 +436,7 @@ def integer_type_to_signedness(type_name: str) -> bool:
         case "u8"|"u16"|"u32"|"u64"|"ptr":
             return False
         case _:
-            raise ValueError(f"Unknown integer type: {type_name}")
+            ltc.error(f"Unknown integer type: {type_name}")
 
 def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = None) -> None:
     """Load an ltc_type into memory.
@@ -458,10 +453,10 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
 
     match resolved_type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            byte_rep_of_val = object.val.to_bytes(get_ltc_type_size(resolved_type), byteorder='little', signed=integer_type_to_signedness(resolved_type))
-            ltc.memory[write_ptr:write_ptr + get_ltc_type_size(resolved_type)] = byte_rep_of_val
+            byte_rep_of_val = object.val.to_bytes(get_ltc_type_size(resolved_type, ltc), byteorder='little', signed=integer_type_to_signedness(resolved_type, ltc))
+            ltc.memory[write_ptr:write_ptr + get_ltc_type_size(resolved_type, ltc)] = byte_rep_of_val
             if memidx is None:
-                ltc.sp += get_ltc_type_size(resolved_type)
+                ltc.sp += get_ltc_type_size(resolved_type, ltc)
         case "string":
             if memidx is None:
                 add_string_to_memory(object, ltc.memory, ltc)
@@ -477,14 +472,14 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
             array_ptr = write_ptr
             match object.arrayType:
                 case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
-                    element_width = get_ltc_type_size(object.arrayType)
+                    element_width = get_ltc_type_size(object.arrayType, ltc)
                     for i, element in enumerate(object.val):
                         element_ptr = array_ptr + (i * element_width)
                         load_to_mem(ltc, element, input_type=object.arrayType, memidx=element_ptr)
                     if memidx is None:
                         ltc.sp += element_width * object.get_size()
                 case "string":
-                    ltc.error(ltc, "strings are not currently supported for arrays")
+                    ltc.error("strings are not currently supported for arrays")
                 case "boolean":
                     element_width = 1
                     for i, element in enumerate(object.val):
@@ -499,38 +494,38 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                 ltc.sp += 1
         case "ptr":
             # Handle pointer type loading
-            ptr_size = get_ltc_type_size("ptr")
+            ptr_size = get_ltc_type_size("ptr", ltc)
             byte_rep_of_val = object.val.to_bytes(ptr_size, byteorder='little', signed=False)
             ltc.memory[write_ptr:write_ptr + ptr_size] = byte_rep_of_val
             if memidx is None:
                 ltc.sp += ptr_size
         case "tuple":
-                object.load_to_memory(ltc.memory, write_ptr)
+                object.load_to_memory(ltc.memory, write_ptr, ltc)
                 if memidx is None:
                     ltc.sp += object.get_byte_size(ltc) 
         case _:
-            ltc.error(ltc, f"Tried to load an unrecognized type '{resolved_type}' into memory")
+            ltc.error(f"Tried to load an unrecognized type '{resolved_type}' into memory")
             
     memory_bounds_check(ltc)
     return
 
 def memory_bounds_check(ltc) -> None:
     if ltc.hp <= ltc.sp:
-        raise MemoryError("Stack and Heap intersect. Out of memory.")
+        ltc.error("Stack and Heap intersect. Out of memory.")
 
 def recieve_empty_form(ltc, type):
     """give the name of the type you want, this function returns an empty instance of that type"""
     match type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            return ltc.types[type](0)
+            return ltc.types[type](0, ltc)
         case "string":
             return ltc.t.string("")
         case "boolean":
             return ltc.t.boolean(False)
         case "array":
-            return ltc.t.array([], None, False)
+            return ltc.t.array([], ltc, None, False)
         case "ptr":
-            return ltc.t.ptr(0)
+            return ltc.t.ptr(0, ltc)
         case "char":
             return ltc.t.char('')
         case "tuple":
@@ -553,8 +548,8 @@ def locate_var_in_namespace(namespace, var_name, return_just_the_check=True):
     else:
         return None, None
 
-def strip_comments(source_text: str) -> str:
-    """Remove // and /* */ comments while preserving quoted strings."""
+def strip_comments(source_text: str, ltc) -> str:
+    """Remove /* */ comments while preserving quoted strings."""
     output_chars: list[str] = []
     cursor = 0
     in_string = False
@@ -587,7 +582,7 @@ def strip_comments(source_text: str) -> str:
                     break
                 cursor += 1
             else:
-                raise SyntaxError("Unterminated block comment '/* ... */'")
+                ltc.error("Unterminated block comment '/* ... */'")
             continue
 
         output_chars.append(current_char)
@@ -598,7 +593,7 @@ def strip_comments(source_text: str) -> str:
 def _get_user_function_meta(user_functions, function_name: str, ltc) -> tuple[list[str], list[str], str]:
     """Return (arg_types, arg_names, body) for a user function."""
     if function_name not in user_functions:
-        raise NameError(f"Function '{function_name}' is not declared")
+        ltc.error(f"Function '{function_name}' is not declared")
 
     entry = user_functions[function_name]
     if isinstance(entry, dict):
@@ -611,17 +606,17 @@ def _get_user_function_meta(user_functions, function_name: str, ltc) -> tuple[li
         arg_names = [f"arg{i}" for i in range(len(arg_types))]
         body = entry[1] if len(entry) > 1 else ""
     else:
-        ltc.error(ltc, f"Invalid function metadata for '{function_name}'")
+        ltc.error(f"Invalid function metadata for '{function_name}'")
 
     if len(arg_types) != len(arg_names):
-        raise SyntaxError(f"Function '{function_name}' has mismatched arg type/name metadata")
+        ltc.error(f"Function '{function_name}' has mismatched arg type/name metadata")
     return arg_types, arg_names, body
 
 def malloc(size: int, ltc) -> None:
     """Reserves memory. Returns starting address of the allocated block."""
 
     if ltc.hp - size <= ltc.sp:
-        raise MemoryError("Heap grew into stack. Out of memory.")
+        ltc.error("Heap grew into stack. Out of memory.")
     
     ltc.hp -= size
 
@@ -629,7 +624,7 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
     ltc_type = ltc.types[type_str]
     match type_str:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            return ltc_type(int.from_bytes(memory[addr:addr + get_ltc_type_size(type_str)], byteorder='little', signed=integer_type_to_signedness(type_str)))
+            return ltc_type(int.from_bytes(memory[addr:addr + get_ltc_type_size(type_str, ltc)], byteorder='little', signed=integer_type_to_signedness(type_str, ltc)), ltc)
         case "string":
             end = addr
             while end < len(memory) and memory[end] != 0:
@@ -640,10 +635,10 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
         case "char":
             return ltc_type(chr(memory[addr]))
         case "ptr":
-            return ltc_type(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False))
+            return ltc_type(int.from_bytes(memory[addr:addr + 8], byteorder='little', signed=False), ltc)
         case _:
             if type_str in ltc.types: # if we want to add support in the future for more types
-                ltc.error(ltc, f"Type '{type_str}' is supposed to be supported but has no defined behavior for reading from memory. Please implement read behavior for this type in read_ltc_type_from_mem helper function.")
+                ltc.error(f"Type '{type_str}' is supposed to be supported but has no defined behavior for reading from memory. Please implement read behavior for this type in read_ltc_type_from_mem helper function.")
             else:
-                ltc.error(ltc, f"Unsupported type for reading from mem: {type_str}")
+                ltc.error(f"Unsupported type for reading from mem: {type_str}")
 

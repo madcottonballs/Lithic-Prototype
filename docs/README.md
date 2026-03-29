@@ -306,6 +306,7 @@
 			This lets you do ptr derefencing without specifying type everytime.
 			This is totally optional.
 			Only variables of type ptr can be tagged. Not any object holding a ptr, and not any ptr.
+			If you're tagging a ptr to an array, the tagged type should be the type of the elements of the array.
 			Ex:
 ```
 				let ptr px = mallocType(i32, 10);   /* allocate space for ten 32 bit signed integers */

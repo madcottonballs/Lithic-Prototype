@@ -1,3 +1,4 @@
+/* load: buffer is the text you want to write, idx is the index, arr is a ptr to the array string array */
 define load(string buffer, i32 idx, ptr arr) {
     /* pass in a ptr to the ptr array*/
     tag(arr, ptr);   /* lets us do ptr indexing */

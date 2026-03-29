@@ -4,11 +4,8 @@ import "strarraylib.ltc" as "strarray";
 define main() {
     printf("Testing what an array of strings looks like:");
     let ptr[5] test;
-    strarray.load("Hello, World!", 0, &test);
-    strarray.load("Goodbye, World!", 1, &test);
-    strarray.load("Testing, 1, 2, 3...", 2, &test);
-    strarray.load("Lorem ipsum dolor sit amet.", 3, &test);
-    strarray.load("The quick brown fox jumps over the lazy dog.", 4, &test);
+    strarray.load(input(), 0, &test);
+
     iterate (i, length(test)) {
         printf(concat("test[", i -> string, "] = ", strings.read(test[i])));
         coredump();

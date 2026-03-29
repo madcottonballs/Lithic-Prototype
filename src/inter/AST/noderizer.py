@@ -71,7 +71,7 @@ def generate_trees(tokens, ltc, start_index=0):
         return
 
     # Pass 0: collapse array type declarations like `i32[4]` into one array token.
-    _build_array_type_tokens(tokens, ltc.t, start_index)
+    _build_array_type_tokens(tokens, ltc, start_index)
 
     # Pass 1: collapse raw parenthesized ranges into `subexp` nodes.
     build_subexp(start_index, tokens, ltc)
@@ -126,7 +126,7 @@ def _build_indexing(start_index, tokens, ltc):
 def _build_index_node(current_token, next_token, tokens, index, ltc):
     t = ltc.t
     if not isinstance(next_token, t.array) or next_token.get_size() != 1:
-        raise SyntaxError("Indexed access expects exactly one index: obj[idx]")
+        ltc.error("Indexed access expects exactly one index: obj[idx]")
     index_token = next_token.val[0]
     tokens[index:index + 2] = [index_oper(current_token, index_token)]
 
@@ -134,7 +134,7 @@ def build_array_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     t = ltc.t
     """Build aSet(arrayRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Indexed assignment requires a variable reference as the array base")
+        ltc.error("Indexed assignment requires a variable reference as the array base")
     args = [
         lhs_ref,
         t.token(","),
@@ -143,13 +143,13 @@ def build_array_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
         rhs_value,
     ]
 
-    return t.function("aSet", args)
+    return t.function("aSet", args, ltc)
 
 def build_tuple_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
     t = ltc.t
     """Build tSet(tupleRef, index, rhs) function node and replace current statement."""
     if not isinstance(lhs_ref, t.var_ref):
-        raise TypeError("Indexed assignment requires a variable reference as the tuple base")
+        ltc.error("Indexed assignment requires a variable reference as the tuple base")
     args = [
         lhs_ref,
         t.token(","),
@@ -158,7 +158,7 @@ def build_tuple_set_call(lhs_ref, lhs_index_token, rhs_value, ltc):
         rhs_value,
     ]
 
-    return t.function("tSet", args)
+    return t.function("tSet", args, ltc)
 
 
 def _build_let_stmts(start_index, tokens, ltc):
@@ -173,34 +173,35 @@ def _build_let_stmts(start_index, tokens, ltc):
                 index += 1
                 continue
             if index + 2 >= len(tokens):
-                raise SyntaxError("let expects syntax: let [type] [varname] OR let [type] [varname] = [value]")
+                ltc.error("let expects syntax: let [type] [varname] OR let [type] [varname] = [value]")
 
-            # Support bare declarations: let <type> <name>
+                # Support bare declarations: let <type> <name>
             if index + 3 >= len(tokens) or tokens[index + 3].val != "=":
                 arguments = tokens[index + 1:index + 3]
-                tokens[index:index + 3] = [t.function("let", arguments)]
+                tokens[index:index + 3] = [t.function("let", arguments, ltc)]
             else:
                 # Support declarations with assignment: let <type> <name> = <full expression>
                 if index + 4 >= len(tokens):
-                    raise SyntaxError("let assignment expects syntax: let [type] [varname] = [value]")
+                    ltc.error("let assignment expects syntax: let [type] [varname] = [value]")
 
                 rhs_tokens = tokens[index + 4:]
                 generate_trees(rhs_tokens, ltc, 0)
                 if len(rhs_tokens) != 1:
-                    raise SyntaxError("let assignment RHS did not reduce to a single value")
+                    ltc.error("let assignment RHS did not reduce to a single value")
 
                 arguments = [tokens[index + 1], tokens[index + 2], tokens[index + 3], rhs_tokens[0]]
-                tokens[index:] = [t.function("let", arguments)]
+                tokens[index:] = [t.function("let", arguments, ltc)]
                 return
         index += 1
 
-def _build_array_type_tokens(tokens, t, start_index=0):
+def _build_array_type_tokens(tokens, ltc, start_index=0):
     """Convert `<type>[<i32>]` into one `t.array` type token.
 
     Example:
       [token('i32'), token('['), i32(2), token(']')]
       -> [array_token(val='array', arrayType='i32', size=2)]
     """
+    t = ltc.t
     index = start_index
     while index + 3 < len(tokens):
         type_token = tokens[index]
@@ -226,14 +227,14 @@ def _build_array_type_tokens(tokens, t, start_index=0):
             continue
 
         if not isinstance(size_token, t.i32):
-            raise SyntaxError("Array size must be a i32 literal in type declaration")
+            ltc.error("Array size must be a i32 literal in type declaration")
         if size_token.val < 0:
-            raise SyntaxError("Array size cannot be negative")
+            ltc.error("Array size cannot be negative")
         if getattr(close_bracket, "val", None) != "]":
-            raise SyntaxError("Array type declaration is missing closing ']'")
+            ltc.error("Array type declaration is missing closing ']'")
 
         # Reuse your existing array class as a type token.
-        array_type_token = t.array([], arrayType=type_token.val, parse=False)
+        array_type_token = t.array([], ltc, arrayType=type_token.val, parse=False)
         array_type_token.val = "array"
         array_type_token.size = size_token.val
         tokens[index:index + 4] = [array_type_token]
@@ -266,11 +267,11 @@ def _build_array_literals(tokens, ltc, start_index=0):
                     break
             close_index += 1
         if close_index >= len(tokens):
-            raise SyntaxError("No closing ']' found for array literal")
+            ltc.error("No closing ']' found for array literal")
 
         element_tokens = tokens[index + 1:close_index]
         generate_trees(element_tokens, ltc, 0)
-        array_literal = ltc.t.array(element_tokens)
+        array_literal = ltc.t.array(element_tokens, ltc, arrayType=None, parse=False)
         tokens[index:close_index + 1] = [array_literal]
         index += 1
 
@@ -317,7 +318,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
             if next_symbol in ("=", "*"):
                 index += 2
                 continue
-            helper.validate_operator(tokens, index, "*")
+            helper.validate_operator(tokens, index, "*", ltc)
             operation_node = mult(tokens[index - 1], tokens[index + 1])
             # Replace "left op right" with one operator node.
             tokens[index - 1:index + 2] = [operation_node]
@@ -329,7 +330,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
             if next_symbol in ("=", "/"):
                 index += 2
                 continue
-            helper.validate_operator(tokens, index, "/")
+            helper.validate_operator(tokens, index, "/", ltc)
             operation_node = div(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
             generate_trees(operation_node.node2, ltc, 0)
@@ -349,12 +350,12 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
                 continue
             if _is_unary_context(index):
                 if index + 1 >= len(tokens):
-                    raise SyntaxError("Unary '+' must be followed by a value.")
+                    ltc.error("Unary '+' must be followed by a value.")
                 # Unary '+' is a no-op for the following expression/value.
                 tokens.pop(index)
                 continue
 
-            helper.validate_operator(tokens, index, "+")
+            helper.validate_operator(tokens, index, "+", ltc)
             operation_node = add(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
             generate_trees(operation_node.node2, ltc, 0)
@@ -367,7 +368,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
                 continue
             if _is_unary_context(index):
                 if index + 1 >= len(tokens):
-                    raise SyntaxError("Unary '-' must be followed by a value.")
+                    ltc.error("Unary '-' must be followed by a value.")
 
                 # Fast path: fold negative numeric literals (e.g. '-15').
                 if isinstance(tokens[index + 1], t.integer):
@@ -382,7 +383,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
                 if isinstance(unary_rhs, t.integer) and type(unary_rhs) is not t.integer:
                     zero_node = type(unary_rhs)(0)
                 else:
-                    zero_node = t.i32(0)
+                    zero_node = t.i32(0, ltc)
 
                 operation_node = sub(zero_node, unary_rhs)
                 tokens[index:index + 2] = [operation_node]
@@ -390,7 +391,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
                 continue
 
             # Binary subtraction.
-            helper.validate_operator(tokens, index, "-")
+            helper.validate_operator(tokens, index, "-", ltc)
             operation_node = sub(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
             generate_trees(operation_node.node2, ltc, 0)
@@ -410,10 +411,10 @@ def _resolve_index_token_to_dword(index_token, ltc):
         if helper.locate_var_in_namespace(ltc.namespace, resolved_index.val, return_just_the_check=True):
             resolved_index = helper.dereference_var(ltc, t.var_ref(resolved_index.val))
         elif str(resolved_index.val).isdigit():
-            resolved_index = t.i32(resolved_index.val)
+            resolved_index = t.i32(resolved_index.val, ltc)
 
     if not isinstance(resolved_index, t.integer):
-        raise TypeError("Index must resolve to an integer")
+        ltc.error("Index must resolve to an integer")
 
     return resolved_index
 
@@ -449,7 +450,7 @@ def _build_opers(tokens, start_idx, ltc):
                         build_not_equal_oper(tokens, index, ltc)
                     case _: # '!' boolean invert operator
                         if index + 1 >= len(tokens):
-                            raise SyntaxError("operator `!` must be followed by a value.")
+                            ltc.error("operator `!` must be followed by a value.")
                         
                         build_invert_oper(tokens, index, ltc)
             case ">":
@@ -511,13 +512,13 @@ def _build_opers(tokens, start_idx, ltc):
                     case _: # '*' multiply operator
                         pass # handled at a different time
             case "^":
-                build_free_oper(tokens, index)
+                build_free_oper(tokens, index, ltc)
             case "&":
-                build_memloc_oper(tokens, index)
+                build_memloc_oper(tokens, index, ltc)
         index += 1
 
 def _check_oper_syntax_errors(oper: str, tokens, index):
     if index + 1 >= len(tokens):
-        raise SyntaxError(f"operator `{oper}` must be followed by a value.")
+        ltc.error(f"operator `{oper}` must be followed by a value.")
     if index < 1:
-        raise SyntaxError(f"operator `{oper}` must be preceded by a value.")
+        ltc.error(f"operator `{oper}` must be preceded by a value.")

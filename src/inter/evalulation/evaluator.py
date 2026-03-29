@@ -50,7 +50,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
         if isinstance(tokens[i], n.subexp):
             return_values = evaluate(tokens[i].val, ltc, return_values, execute_source_fn)
             if len(tokens[i].val) != 1:
-                raise TypeError(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
+                ltc.error(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
 
         if isinstance(tokens[i], n.at_func_return):
@@ -74,13 +74,13 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
 
         if isinstance(tokens[i], t.user_function): # resolves user function calls
             if execute_source_fn is None:
-                raise RuntimeError("user_function execution requires execute_source_fn")
+                ltc.error("user_function execution requires execute_source_fn")
 
             for arg_idx, arg_val in enumerate(tokens[i].arguments):
                 arg_val = helper.resolve_node(arg_val, ltc, return_values, evaluate, execute_source_fn)
                 tokens[i].arguments[arg_idx] = arg_val
 
-            tokens[i].validate_args(ltc.user_functions)
+            tokens[i].validate_args(ltc.user_functions, ltc)
             arg_types, arg_names, body_source = helper._get_user_function_meta(ltc.user_functions, tokens[i].val, ltc)
 
             helper.create_frame(ltc)
@@ -94,7 +94,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
             if local_returns:
                 tokens[i] = local_returns[0]
             else:
-                raise RuntimeError(f"User function '{tokens[i].val}' did not return a value")
+                ltc.error(f"User function '{tokens[i].val}' did not return a value")
 
         i += 1
 
@@ -120,12 +120,12 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             data.resolve_concat(tokens, i, ltc)
         case "length":
             if len(tokens[i].args) != 1:
-                raise SyntaxError("length() expects exactly one argument")
+                ltc.error("length() expects exactly one argument")
             arg = tokens[i].args[0]
             if isinstance(arg, t.string | t.array):
-                tokens[i] = t.i32(len(arg.val))
+                tokens[i] = t.i32(len(arg.val), ltc)
             elif isinstance(arg, t.ltctuple):
-                tokens[i] = t.i32(arg.get_size())
+                tokens[i] = t.i32(arg.get_size(), ltc)
 
         case "aSet":
             data.resolve_aset(tokens, i, ltc)
@@ -133,7 +133,7 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             data.resolve_tset(tokens, i, ltc)
         case "return":
             if len(tokens[i].args) != 1:
-                raise SyntaxError("return expects exactly one argument")
+                ltc.error("return expects exactly one argument")
             return_values = [tokens[i].args[0]]
         
         case "cast":
@@ -146,10 +146,10 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             cmd.resolve_coredump(tokens, i, ltc)
         case "exit":
             if len(tokens[i].args) != 1:
-                raise SyntaxError("exit expects exactly one argument")
+                ltc.error("exit expects exactly one argument")
             arg = tokens[i].args[0]
             if not isinstance(arg, t.integer):
-                raise TypeError(f"exit code argument must be an integer, got {type(arg).__name__}")
+                ltc.error(f"exit code argument must be an integer, got {type(arg).__name__}")
             exit(arg.val)
         
         case "@":
@@ -157,7 +157,7 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
         case "makeTuple":
             data.resolve_maketuple(tokens, i, ltc)        
         case "pass":
-            tokens[i] = t.i32(0)
+            tokens[i] = t.i32(0, ltc)
         case "tag":
             data.resolve_tag(tokens, i, ltc)
         case "untag":
