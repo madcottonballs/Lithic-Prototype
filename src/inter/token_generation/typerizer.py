@@ -351,9 +351,6 @@ class user_function():
             if actual_type_name == "ltctuple":
                 actual_type_name = "tuple"
 
-            if isinstance(actual_arg, array):
-                actual_type_name = f"{actual_arg.arrayType}[{actual_arg.get_size()}]"
-
             if actual_type_name != expected_type_name:
                 ltc.error(
                     f"Function '{self.val}' expected argument {i+1} to be type '{expected_type_name}', "

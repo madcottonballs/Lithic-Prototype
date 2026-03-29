@@ -1,8 +1,10 @@
-define main() {
-    printf("hello, welcome to the first proper program written in this language. What's your name?");
-    let string user_input = input();
-    if (user_input -> boolean) {
-        printf(concat("Wow, ", user_input, " is such a lovely name!"));
-    }
+define test(array y) {
+    y[0] = true;
+    return(y);
+}
+define main() {;
+    let array x = [false, true];
+    x = test(x);
+    printf(x);
     return(0);
 }

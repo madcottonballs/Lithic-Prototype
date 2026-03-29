@@ -5,3 +5,18 @@ define load(string buffer, i32 idx, ptr arr) {
     arr[idx] = &buffer;
     return(0);
 }
+
+/* read: read a string from a pointer to a string 
+you should enter the *already indexed* array element, so if you want to read the first element of the strarray, you should pass in arr[0]
+*/
+define read(ptr original) {
+    tag(original, char);   /* lets us do ptr indexing */
+    let string result;
+    let i32 i2;
+    while (original[i2] != '\0') {
+        result = concat(result, original[i2]);
+        i2 += 1;
+    }
+    return(result);
+}
+

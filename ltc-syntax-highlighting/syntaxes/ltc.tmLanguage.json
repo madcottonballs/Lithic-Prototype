@@ -40,7 +40,8 @@
 			},
 			{
 				"name": "storage.type.function",
-				"match": "\\b(define)\\b"
+				"match": "\\b(define|false|true)\\b",
+				"comment":"Blue keywords are used for function definitions and boolean literals "
 			}]
 		},
 		"comments": {

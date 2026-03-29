@@ -271,7 +271,7 @@ def _build_array_literals(tokens, ltc, start_index=0):
 
         element_tokens = tokens[index + 1:close_index]
         generate_trees(element_tokens, ltc, 0)
-        array_literal = ltc.t.array(element_tokens, ltc, arrayType=None, parse=False)
+        array_literal = ltc.t.array(element_tokens, ltc, arrayType=None, parse=True)
         tokens[index:close_index + 1] = [array_literal]
         index += 1
 
