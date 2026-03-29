@@ -66,7 +66,7 @@ class State:
             "ptr": t.ptr,
             "tuple": t.ltctuple,
         }
-        self.arrayTypes = (
+        self.primitives = ( # all supported array element types
             "char",
             "i32",
             "boolean",
@@ -80,9 +80,8 @@ class State:
             "ptr",
         )
 
-"""Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet."""
 def error(ltc, message):
-    """Print an error message and exit the program."""
+    """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet.*"""
     print("Traceback (most recent call last):")
     for i, v in enumerate(reversed(ltc.traceback)):
         print(f"In {v}( ... )")

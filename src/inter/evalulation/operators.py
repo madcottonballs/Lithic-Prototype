@@ -42,6 +42,13 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             resolve_bool_oper(ltc, tokens, i, "<=", return_values, evaluate, execute_source_fn)
             return True
 
+    # Resolve arithmetic operands that may still be var_refs or index nodes.
+    if isinstance(tokens[i], (n.add, n.sub, n.mult, n.div)):
+        if not isinstance(tokens[i].node1, t.integer):
+            tokens[i].node1 = ltc.helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
+        if not isinstance(tokens[i].node2, t.integer):
+            tokens[i].node2 = ltc.helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
+
     if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.integer):
         if type(tokens[i].node1) == t.ptr or type(tokens[i].node2) == t.ptr: # 
             ptr_arithmatic = True
@@ -138,7 +145,8 @@ def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_f
         # For arrays, we want to return the element at the index, but we need to make sure to return it as the correct type according to the array's element type. This is because the elements of the array are stored as their raw values (e.g. an i32 array stores the i32 values directly), so when we retrieve an element from the array we need to wrap it in the appropriate ltc_type class (e.g. t.i32) before returning it.
         elem = base.val[index_val]
         val = elem.val if hasattr(elem, "val") else elem
-        if base.arrayType in ltc.arrayTypes:
+        
+        if base.arrayType in ltc.primitives:
             tokens[i] = ltc.types[base.arrayType](val)
         else:
             raise TypeError("Unsupported type of array used for indexing")
@@ -295,6 +303,25 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
 
     rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
+    # Strings can grow; if the new value doesn't fit, relocate and update the variable's address.
+    if var_type == "string" and isinstance(rhs, t.string):
+        # Determine current capacity if tracked.
+        capacity = var_meta.get("capacity")
+        new_len = len(rhs.val.encode("utf-8")) + 1
+        if capacity is not None and new_len <= capacity:
+            helper.load_to_mem(ltc, rhs, "string", memidx=mem_addr)
+            tokens[i] = t.i32(0)
+            return
+
+        # If capacity is unknown or insufficient, allocate on the heap.
+        string_copy = t.string(rhs.val)
+        new_capacity = max(new_len, (capacity * 2) if capacity else 16)
+        new_addr, alloc = helper.add_string_to_heap(string_copy, ltc.memory, ltc, capacity=new_capacity)
+        var_meta["addr"] = new_addr
+        var_meta["capacity"] = alloc
+        tokens[i] = t.i32(0)
+        return
+
     if var_type == "array":
         if not isinstance(rhs, t.array):
             raise TypeError(f"Type mismatch in assignment to variable '{var_name}': expected array, got {type(rhs).__name__}")
@@ -425,6 +452,16 @@ def resolve_memloc_oper(tokens, i, ltc):
         raise TypeError(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
 
     rhs = ltc.helper.resolve_node(rhs, ltc, None, None, None) # can just pass None for the last three arguments since resolve_node will not use them when resolving a var_ref
+
+    # Strings are dynamic and stack-lifetime; take a stable heap copy for '&string'.
+    if isinstance(rhs, t.string):
+        if rhs.inmemory and rhs.memloc is not None and rhs.memloc >= ltc.hp:
+            tokens[i] = t.ptr(rhs.memloc)
+            return
+        string_copy = t.string(rhs.val)
+        addr, _ = ltc.helper.add_string_to_heap(string_copy, ltc.memory, ltc)
+        tokens[i] = t.ptr(addr)
+        return
 
     if not rhs.inmemory:
         raise TypeError(f"Object '{rhs.val}' of type '{type(rhs).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")

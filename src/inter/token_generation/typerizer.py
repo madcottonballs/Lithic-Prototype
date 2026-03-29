@@ -379,12 +379,39 @@ def parser(tokens, ltc): # tokens is not always ltc.tokens
         while char_index < len(token_text):
             current_char = token_text[char_index]
 
+            # Char literal: 'x' or escaped form like '\n', '\0', '\\', '\''
             is_char_literal = ( len(token_text) == 3 and token_text[0] == "\'" and token_text[-1] == token_text[0] )
+            is_escaped_char_literal = (
+                len(token_text) == 4
+                and token_text[0] == "\'"
+                and token_text[-1] == token_text[0]
+                and token_text[1] == "\\"
+            )
             is_string_literal = ( len(token_text) >= 2 and token_text[0] == "\"" and token_text[-1] == token_text[0] )
             
             if is_char_literal:  # Quoted token is a char literal; strip surrounding quotes.
                 is_int = False
                 tokens[token_index] = char(token_text[1])
+                break
+            if is_escaped_char_literal:
+                is_int = False
+                escape_char = token_text[2]
+                match escape_char:
+                    case "n":
+                        decoded = "\n"
+                    case "t":
+                        decoded = "\t"
+                    case "0":
+                        decoded = "\0"
+                    case "\\":
+                        decoded = "\\"
+                    case "\"":
+                        decoded = "\""
+                    case "'":
+                        decoded = "'"
+                    case _:
+                        decoded = escape_char
+                tokens[token_index] = char(decoded)
                 break
             elif is_string_literal:  # Quoted token is a string literal; strip surrounding quotes.
                 is_int = False

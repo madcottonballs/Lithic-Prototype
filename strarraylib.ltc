@@ -1,0 +1,6 @@
+define load(string buffer, i32 idx, ptr arr) {
+    /* pass in a ptr to the ptr array*/
+    tag(arr, ptr);   /* lets us do ptr indexing */
+    arr[idx] = &buffer;
+    return(0);
+}

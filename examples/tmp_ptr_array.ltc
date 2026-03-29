@@ -1,0 +1,11 @@
+define main() {
+    printf("Testing what an array of strings looks like:");
+    let ptr[3] test;
+    let string buffer;
+    buffer = "Hello, World!";
+    test[0] = &buffer;
+    iterate (i, 3) {
+        printf(concat("test[", i -> string, "] = ", @(test[i], ptr, 0) -> string));
+    }
+    return(0);
+}

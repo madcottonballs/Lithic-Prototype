@@ -8,17 +8,26 @@ def destroy_frame(ltc) -> None:
     ltc.namespace.pop()
 
 def resolve_node(node, ltc, return_values, evaluate, execute_source_fn):
-    """Resolve a node that is an operand of an operator. This is used to evaluate the operands before performing the operation. It takes a node and returns the resolved object of that node."""
-    n = ltc.n
+    """Resolve a node to its runtime value.
+
+    This is used to evaluate operands before performing operations or calling built-ins.
+    """
     t = ltc.t
-    if isinstance(node, n.oper | n.mono_oper | n.subexp | t.function | t.user_function):
-        temp = [node]
-        evaluate(temp, ltc, return_values, execute_source_fn)  # return_values can be ignored since we are only evaluating a single node, so there will only be one return value and it will be at index 0
-        return temp[0]
-    elif isinstance(node, t.var_ref):
-        node = dereference_var(ltc, node)
+    # Always dereference var refs directly so we preserve var_name on ptrs.
+    if isinstance(node, t.var_ref):
+        return dereference_var(ltc, node)
+
+    # If evaluate isn't available (some callers pass None), just return the node as-is.
+    if evaluate is None:
         return node
-    return node # no operation needed, return the node as is
+
+    # Evaluate any node type by running it through the evaluator.
+    temp = [node]
+    evaluate(temp, ltc, return_values, execute_source_fn)
+    resolved = temp[0]
+    if isinstance(resolved, t.var_ref):
+        return dereference_var(ltc, resolved)
+    return resolved
 
 
 # helper function for parser: finds the closing parenthesis for a given opening parenthesis index, and replaces the full "(...)" slice with one `subexp` node containing the inner tokens.
@@ -69,6 +78,22 @@ def add_string_to_memory(string, memory, ltc) -> None:
     string.memloc = ltc.sp
     memory[ltc.sp:ltc.sp + len(byte_rep_of_str)] = byte_rep_of_str
     ltc.sp += len(byte_rep_of_str)
+
+def add_string_to_heap(string, memory, ltc, capacity: int | None = None) -> tuple[int, int]:
+    """Write a string to the heap and return (start_addr, capacity)."""
+    byte_rep_of_str = string.val.encode('utf-8') + b'\x00'
+    needed = len(byte_rep_of_str)
+    alloc = max(needed, capacity or needed)
+    start = ltc.hp - alloc
+    if start <= ltc.sp:
+        raise MemoryError("Stack and Heap intersect. Out of memory.")
+    string.inmemory = True
+    string.memloc = start
+    # Zero-fill the allocation, then write the string bytes.
+    memory[start:start + alloc] = b'\x00' * alloc
+    memory[start:start + needed] = byte_rep_of_str
+    ltc.hp = start
+    return start, alloc
 
 def find_matching(source_text: str, opening_index: int, opening_char: str, closing_char: str) -> int:
     """Return index of the closing delimiter matching opening_index.
@@ -383,24 +408,14 @@ def dereference_var(ltc, var_ref_token) -> object:
             return array_obj
         case "tuple":
             element_types = var_meta["element_types"]
-            return ltc.t.ltctuple.read_from_memory(addr, element_types, ltc) # returns the ltctuple obj
+            return t.ltctuple.read_from_memory(addr, element_types, ltc) # returns the ltctuple obj
         case _:
             ltc.error(ltc, f"Unsupported variable type: {var_type}")
 
 # decremented, use get_ltc_type_size instead for all type size needs to ensure consistency and avoid bugs where integer type sizes are mismatched across different helper functions
 def integer_type_to_size(type_name: str) -> int:
     """Helper function to get the byte size of an integer type."""
-    match type_name:
-        case "i8"|"u8":
-            return 1
-        case "i16"|"u16":
-            return 2
-        case "i32"|"u32":
-            return 4
-        case "i64"|"u64":
-            return 8
-        case _:
-            raise ValueError(f"Unknown integer type: {type_name}")
+    raise DeprecationWarning("integer_type_to_size is deprecated, use get_ltc_type_size instead for all type size needs to ensure consistency")
 
 def get_ltc_type_size(type_name: str) -> int:
     """Helper function to get the byte size of any LTC type."""
@@ -409,9 +424,9 @@ def get_ltc_type_size(type_name: str) -> int:
             return 1
         case "i16"|"u16":
             return 2
-        case "i32"|"u32"|"ptr":
+        case "i32"|"u32":
             return 4
-        case "i64"|"u64":
+        case "i64"|"u64"|"ptr":
             return 8
         case "string" | "array" | "tuple" | "ltctuple":
             raise ValueError(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
@@ -429,7 +444,7 @@ def integer_type_to_signedness(type_name: str) -> bool:
             raise ValueError(f"Unknown integer type: {type_name}")
 
 def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = None) -> None:
-    """Load an object into memory.
+    """Load an ltc_type into memory.
 
     - Allocation mode (memidx is None): write at stack_ptr and advance sp.
     - Overwrite mode (memidx is set): write at memidx and keep sp unchanged.
@@ -461,7 +476,7 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
         case "array":
             array_ptr = write_ptr
             match object.arrayType:
-                case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
+                case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
                     element_width = get_ltc_type_size(object.arrayType)
                     for i, element in enumerate(object.val):
                         element_ptr = array_ptr + (i * element_width)
@@ -484,10 +499,11 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
                 ltc.sp += 1
         case "ptr":
             # Handle pointer type loading
-            byte_rep_of_val = object.val.to_bytes(8, byteorder='little', signed=False)
-            ltc.memory[write_ptr:write_ptr + 8] = byte_rep_of_val
+            ptr_size = get_ltc_type_size("ptr")
+            byte_rep_of_val = object.val.to_bytes(ptr_size, byteorder='little', signed=False)
+            ltc.memory[write_ptr:write_ptr + ptr_size] = byte_rep_of_val
             if memidx is None:
-                ltc.sp += 8
+                ltc.sp += ptr_size
         case "tuple":
                 object.load_to_memory(ltc.memory, write_ptr)
                 if memidx is None:
@@ -517,6 +533,8 @@ def recieve_empty_form(ltc, type):
             return ltc.t.ptr(0)
         case "char":
             return ltc.t.char('')
+        case "tuple":
+            return ltc.t.ltctuple(ltc, ())
 
 def locate_var_in_namespace(namespace, var_name, return_just_the_check=True):
     """Search for a variable in the namespace stack and return its metadata and scope level.

@@ -23,7 +23,7 @@ def process_imports(source_text: str) -> str:
                 with open(f"{module_name}.{module_ext}", "r") as f:
                     module_source = f.read()
             except FileNotFoundError:
-                raise Exception(f"Module '{module_name}' not found.")
+                raise Exception(f"Module {module_name}.{module_ext} not found.")
 
             # Recursively process imports in the module source
             processed_module_source = process_imports(module_source)

@@ -10,12 +10,22 @@ def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
     for idx, (expected_type, arg_name) in enumerate(zip(arg_types, arg_names)):
         argument_value = call_node.arguments[idx]
 
-        var_addr = ltc.sp
-        ltc.helper.load_to_mem(ltc, argument_value, expected_type)
-        entry = {
-            "type": expected_type,
-            "addr": var_addr,
-        }
+        # Strings are dynamic; place them on the heap to avoid stack lifetime issues.
+        if expected_type == "string" and isinstance(argument_value, ltc.t.string):
+            string_copy = ltc.t.string(argument_value.val)
+            var_addr, capacity = ltc.helper.add_string_to_heap(string_copy, ltc.memory, ltc)
+            entry = {
+                "type": expected_type,
+                "addr": var_addr,
+                "capacity": capacity,
+            }
+        else:
+            var_addr = ltc.sp
+            ltc.helper.load_to_mem(ltc, argument_value, expected_type)
+            entry = {
+                "type": expected_type,
+                "addr": var_addr,
+            }
         if expected_type == "tuple" and isinstance(argument_value, ltc.t.ltctuple):
             entry["element_types"] = argument_value.element_types
         if expected_type == "array" and isinstance(argument_value, ltc.t.array):
@@ -56,6 +66,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
                 arg_val = helper.resolve_node(arg_val, ltc, return_values, evaluate, execute_source_fn)
                 # Do not force all function args to be runtime values here.
                 # `let` intentionally carries identifier/operator tokens through to function_processing.
+                tokens[i].args[arg_idx] = arg_val
                 tokens[i].args[arg_idx] = arg_val
             return_values = function_processing(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             if isinstance(tokens[i], t.function) and tokens[i].val == "return":

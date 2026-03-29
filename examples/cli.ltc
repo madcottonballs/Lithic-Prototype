@@ -1,9 +1,15 @@
+import "stringlib.ltc";
 define main() {
-    let i32 x = cmd("echo Hello, World!");
-    let ptr[5] px;
-    px[0] = &x;
-    @(px[0], i32, 0) = 5;
-    printf(concat("The exit code of the command was: ", x -> string));
-    printf(concat("The value at px[0] is: ", @(px[0], i32, 0) -> string));
+    printf("Testing what an array of strings looks like:");
+    let ptr[5] test;
+    stringlib.strarraylib.load("Hello, World!", 0, &test);
+    stringlib.strarraylib.load("Goodbye, World!", 1, &test);
+    stringlib.strarraylib.load("Testing, 1, 2, 3...", 2, &test);
+    stringlib.strarraylib.load("Lorem ipsum dolor sit amet.", 3, &test);
+    stringlib.strarraylib.load("The quick brown fox jumps over the lazy dog.", 4, &test);
+    iterate (i, length(test)) {
+        printf(concat("test[", i -> string, "] = ", stringlib.read(test[i])));
+        coredump();
+    }
     return(0);
 }

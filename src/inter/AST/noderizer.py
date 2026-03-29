@@ -83,12 +83,11 @@ def generate_trees(tokens, ltc, start_index=0):
     #   let i32 x      -> function("let", [i32, x])
     _build_let_stmts(start_index, tokens, ltc)
 
-    _build_opers(tokens, start_index, ltc)
-
-    _dereference_vars(start_index, tokens, ltc)
+    # Indexing has higher precedence than arithmetic/comparisons.
+    _build_indexing(start_index, tokens, ltc)
     
     _build_add_sub_mult_div_nodes(start_index, tokens, ltc)
-    _build_indexing(start_index, tokens, ltc)
+    _build_opers(tokens, start_index, ltc)
 
 def _build_indexing(start_index, tokens, ltc):
     index = start_index
@@ -102,6 +101,9 @@ def _build_indexing(start_index, tokens, ltc):
         type_of_current_token = type(current_token).__name__
         type_of_next_token = type(next_token).__name__
         match type_of_current_token:
+            case "var_ref":
+                if type_of_next_token == "array" and next_token.get_size() == 1:
+                    _build_index_node(current_token, next_token, tokens, index, ltc)
             case "ptr":
                 if type_of_next_token == "array" and next_token.get_size() == 1:
                     _build_index_node(current_token, next_token, tokens, index, ltc)
@@ -311,6 +313,10 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
     while index < len(tokens):
         symbol = getattr(tokens[index], "val", None)
         if symbol == "*":
+            next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
+            if next_symbol in ("=", "*"):
+                index += 2
+                continue
             helper.validate_operator(tokens, index, "*")
             operation_node = mult(tokens[index - 1], tokens[index + 1])
             # Replace "left op right" with one operator node.
@@ -319,6 +325,10 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
             generate_trees(operation_node.node2, ltc, 0)
 
         elif symbol == "/":
+            next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
+            if next_symbol in ("=", "/"):
+                index += 2
+                continue
             helper.validate_operator(tokens, index, "/")
             operation_node = div(tokens[index - 1], tokens[index + 1])
             tokens[index - 1:index + 2] = [operation_node]
@@ -333,6 +343,10 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
     while index < len(tokens):
         symbol = getattr(tokens[index], "val", None)
         if symbol == "+":
+            next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
+            if next_symbol in ("=", "+"):
+                index += 2
+                continue
             if _is_unary_context(index):
                 if index + 1 >= len(tokens):
                     raise SyntaxError("Unary '+' must be followed by a value.")
@@ -346,6 +360,11 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
             generate_trees(operation_node.node2, ltc, 0)
 
         elif symbol == "-":
+            # Preserve arrow operator "->" for the cast pass.
+            next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
+            if next_symbol in (">", "=", "-"):
+                index += 2
+                continue
             if _is_unary_context(index):
                 if index + 1 >= len(tokens):
                     raise SyntaxError("Unary '-' must be followed by a value.")

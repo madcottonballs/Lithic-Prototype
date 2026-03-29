@@ -37,6 +37,10 @@ def resolve_let(tokens, i, ltc) -> None:
                     f"but was assigned {var_value_arg.arrayType}[{len(var_value_arg.val)}]"
                 )
             helper.load_to_mem(ltc, var_value_arg, "array")
+        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "string":
+            # Store strings on heap to avoid stack lifetime issues.
+            string_copy = t.string(var_value_arg.val)
+            var_mem_addr, capacity = helper.add_string_to_heap(string_copy, ltc.memory, ltc)
         else:
             helper.load_to_mem(ltc, var_value_arg, var_type_arg.val)
     else:
@@ -44,6 +48,9 @@ def resolve_let(tokens, i, ltc) -> None:
             empty_array = t.array([], arrayType=var_type_arg.arrayType, parse=False)
             empty_array.size = var_type_arg.size
             helper.load_to_mem(ltc, empty_array, "array")
+        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "string":
+            # Empty strings start on the stack; they'll migrate to heap if they grow.
+            helper.load_to_mem(ltc, t.string(""), "string")
         else:
             helper.load_to_mem(ltc, helper.recieve_empty_form(ltc, var_type_arg.val), var_type_arg.val)
     
@@ -70,10 +77,13 @@ def resolve_let(tokens, i, ltc) -> None:
             "element_types": tuple_element_types,
         }
     else:
-        ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
+        entry = {
             "type": var_type_arg.val,
             "addr": var_mem_addr,
         }
+        if isinstance(var_type_arg, t.token) and var_type_arg.val == "string" and "capacity" in locals():
+            entry["capacity"] = capacity
+        ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = entry
 
     tokens[i] = t.i32(0)
 
@@ -117,7 +127,17 @@ def resolve_concat(tokens, i, ltc) -> None:
     expected_type = None
     for arg in tokens[i].args:
         if expected_type is None: # set the expected type based on the first argument
+            if isinstance(arg, t.char):
+                expected_type = t.string
+                concatenated = arg.val
+                continue
             expected_type = type(arg)
+
+        # Allow char to participate in string concatenation.
+        if expected_type is t.string and isinstance(arg, t.char):
+            concatenated = ("" if concatenated is None else concatenated) + arg.val
+            continue
+
         if type(arg) != expected_type: # enforce that all arguments are of the same type
             raise TypeError(f"Argument type mismatch in concat: expected {expected_type.__name__}, got {type(arg).__name__}")
         
@@ -270,12 +290,19 @@ def resolve_deref(tokens, i, ltc) -> None:
     t = ltc.t
     helper = ltc.helper
     n = ltc.n
+    if len(tokens[i].args) == 2:
+        index_operation = False # 2 args, no index provided, just dereference the pointer as is (index defaults to 0)
     if len(tokens[i].args) != 3:
-        raise SyntaxError("@ expects exactly three arguments: @(ptr, type, index)")
-    
+        raise SyntaxError("@ expects exactly three arguments: @(ptr, type, index) or @(ptr, type) for dereferencing without indexing (index defaults to 0)")
+    else:
+        index_operation = True # 3 args
+
     ptr_arg = tokens[i].args[0]
     type_arg = tokens[i].args[1]
-    index_arg = tokens[i].args[2]
+    if index_operation:
+        index_arg = tokens[i].args[2]
+    else:
+        index_arg = t.i32(0) # default index value for non-indexed dereference
 
     if not isinstance(ptr_arg, t.ptr):
         raise TypeError(f"First argument to @ must be a pointer, got {type(ptr_arg).__name__}")
@@ -284,16 +311,10 @@ def resolve_deref(tokens, i, ltc) -> None:
     if not isinstance(index_arg, t.integer):
         raise TypeError(f"Third argument to @ must be an integer, got {type(index_arg).__name__}")
 
-    match type_arg.val:
-        # note: all types that are supported by @ must have .read_from_memory implemented in their ltc type class, which is used here to read the byte value from memory
-        case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
-            type_size = helper.integer_type_to_size(type_arg.val)
-        case "boolean":
-            type_size = 1
-        case "char":
-            type_size = 1
-        case _:
-            raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
+    if type_arg.val in ltc.primitives:
+        type_size = helper.get_ltc_type_size(type_arg.val)
+    else:
+        raise TypeError(f"Unsupported type for @ operator: '{type_arg.val}'. Only fixed-length types are supported for now.")
     
     ptr_offset: int = ptr_arg.val + (index_arg.val * type_size) # calculate the memory offset to read from by adding the base pointer value and the index multiplied by the size of the type being dereferenced. This allows for pointer arithmetic to access elements in an array or fields in a struct/tuple.
 
