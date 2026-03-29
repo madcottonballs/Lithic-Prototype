@@ -329,18 +329,19 @@
 			Removes a type tag from a ptr.
 
 ###		*split([string], [char] | [array], [boolean])
-			Breaks a single string (arg 1) into substrings (stored in a tuple) based on argument 2.
-			Argument 2 is either a single char or an array of chars.
-			Argument 3 is an optional argument. 
-			If arg 3 is false, the split character(s) are not saved among the substrings. If it is true, the split character(s) are saved among the substrings.
+Breaks a single string (arg 1) into substrings (stored in a tuple) based on argument 2.
+Argument 2 is either a single char or an array of chars.
+Argument 3 is an optional argument. 
+If arg 3 is false, the split character(s) are not saved among the substrings. If it is true, the split character(s) are saved among the substrings.
 
-			If arg 2 is a char, split() looks over the arg 1 string and breaks it up when an instance of that char is found.
-			Ex:
->				let tuple new = split("hello world", ' ') 		/* 'new' is assigned the tuple: ("hello", "world") */
+If arg 2 is a char, split() looks over the arg 1 string and breaks it up when an instance of that char is found.
+Example:
+>let tuple new = split("hello world", ' ') 		/* 'new' is assigned the tuple: ("hello", "world") */
 
-			If arg 2 is an array of char's, split() will split up arg 1 whenever it finds any of the chars in the array.
-			Ex:
->				let tuple new = split("5 + 9 * 10", [' ', '+', '*'], true) 		/* 'new' is assigned the tuple: ("5", " ", "+", " ", "*", " ", "10") */
+If arg 2 is an array of char's, split() will split up arg 1 whenever it finds any of the chars in the array.
+Ex:
+>let tuple new = split("5 + 9 * 10", [' ', '+', '*'], true) 		/* 'new' is assigned the tuple: ("5", " ", "+", " ", "*", " ", "10") */
+
 ###		*([string], [string])		
 
 # Control Flow:
