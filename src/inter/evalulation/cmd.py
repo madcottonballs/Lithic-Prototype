@@ -23,7 +23,7 @@ def ltc_print(ltc, tokens, i) -> None:
 def ltc_input(tokens, i, ltc) -> None:
     t = ltc.t
     if len(tokens[i].args) != 0:
-        ltc.error("input does not take any arguments")
+        ltc.error(f"input() expects no arguments, instead got {len(tokens[i].args)}")
     try:
         tokens[i] = t.string(input())
     except EOFError:

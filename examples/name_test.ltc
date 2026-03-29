@@ -1,6 +1,8 @@
-let string welcome_message = "hello, welcome to the first proper program written in this language. What's your name?";
-printf(welcome_message);
-let string user_input = input();
-if (user_input) {
-    printf(stringConcat("Wow, ", user_input, " is such a lovely name!"));
+define main() {
+    printf("hello, welcome to the first proper program written in this language. What's your name?");
+    let string user_input = input();
+    if (user_input -> boolean) {
+        printf(concat("Wow, ", user_input, " is such a lovely name!"));
+    }
+    return(0);
 }

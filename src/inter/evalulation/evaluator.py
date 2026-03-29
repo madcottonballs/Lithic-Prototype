@@ -50,7 +50,10 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
         if isinstance(tokens[i], n.subexp):
             return_values = evaluate(tokens[i].val, ltc, return_values, execute_source_fn)
             if len(tokens[i].val) != 1:
-                ltc.error(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
+                if ltc.current_stmt == "main()":
+                    ltc.error(f"Main function body did not return a value, possibly because it was not defined correctly, instead got '{tokens[i].val}'") # more helpful error message for this common mistake
+                else:
+                    ltc.error(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
             tokens[i] = tokens[i].val[0]
 
         if isinstance(tokens[i], n.at_func_return):
