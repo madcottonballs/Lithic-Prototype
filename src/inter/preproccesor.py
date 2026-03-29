@@ -7,7 +7,6 @@ def process_imports(source_text: str, ltc) -> str:
 
     lines = source_text.splitlines()
     processed_lines: list[str] = []
-
     for line in lines:
         stripped_line = line.strip()
         if stripped_line.startswith("import "):
@@ -21,7 +20,11 @@ def process_imports(source_text: str, ltc) -> str:
                 with open(f"{module_name}.{module_ext}", "r") as f:
                     module_source = f.read()
             except FileNotFoundError:
-                raise Exception(f"Module {module_name}.{module_ext} not found.")
+                try: # try to check if it's in the stdlib directory
+                    with open(f"{ltc.STDLIB_PATH}\\{module_name}.{module_ext}", "r") as f:
+                        module_source = f.read()
+                except FileNotFoundError:
+                    raise Exception(f"Module {module_name}.{module_ext} not found. Tried checking stdlib under: '{ltc.STDLIB_PATH}\\{module_name}.{module_ext}', but also couldn't find it.")
 
             # Recursively process imports in the module source
             processed_module_source = process_imports(module_source, ltc)

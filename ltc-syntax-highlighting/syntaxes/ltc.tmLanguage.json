@@ -36,7 +36,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.flow",
-				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass|import)\\b"
+				"match": "\\b(if|else|while|for|return|iterate|enumerate|goto|pass|import|as)\\b"
 			},
 			{
 				"name": "storage.type.function",
@@ -84,7 +84,7 @@
 				},
 				{
 					"name": "support.function.builtin",
-					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|sLength|typeof|sizeof|sConcat|aConcat|aLength|aSet|malloc)\\b"
+					"match": "\\b(print|printf|input|cmd|inline_C|inline_Asm|inline_IR|exit|length|typeof|sizeof|concat|aSet|malloc)\\b"
 				}
 			]
 		},

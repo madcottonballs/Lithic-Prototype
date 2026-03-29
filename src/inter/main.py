@@ -26,6 +26,9 @@ class State:
         self.raw_source = ""
         self.line = 1
         self.current_source = ""
+        self.LITHIC_ROOT = os.path.dirname(os.path.abspath(__file__))
+        self.STDLIB_PATH = "stdlib" # os.path.join(self.LITHIC_ROOT, "stdlib")   #  os.path.join will be used in final version, but for now we can just use a relative path since the working directory is always the project root 
+
         self.function_names = [
             "printf",
             "let",
