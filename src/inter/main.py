@@ -176,7 +176,7 @@ def execute_source(source, ltc: State, return_values) -> list:
     \n Returns return value(s) if executing a function body"""
     
     source_text = helper.strip_comments(source)
-    source_text = preproccesor.process_imports(source_text)
+    source_text = preproccesor.process_imports(source_text, ltc)
     ltc.current_source = source_text
     cursor = 0
     source_length = len(source_text)

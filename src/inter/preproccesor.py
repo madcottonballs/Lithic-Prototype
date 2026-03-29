@@ -1,6 +1,6 @@
 import re
 
-def process_imports(source_text: str) -> str:
+def process_imports(source_text: str, ltc) -> str:
     """Process import statements in the source text and return the modified source text."""
     # Strip block comments so the parser doesn't see stray '/' tokens.
     source_text = re.sub(r"/\*.*?\*/", "", source_text, flags=re.DOTALL)
@@ -12,12 +12,10 @@ def process_imports(source_text: str) -> str:
         stripped_line = line.strip()
         if stripped_line.startswith("import "):
             # Extract the module name
-            module_file = stripped_line[len("import "):].strip().strip(";").strip('"').split(".")
-            module_name = module_file[0]
-            module_ext = module_file[1] if len(module_file) == 2 else ""
-
-            if not module_ext:
-                raise Exception(f"Module '{module_name}' does not have a file extension.")
+            import_stmt = ltc.tokenizer.import_lexer(stripped_line)
+            module_name = import_stmt.module_name
+            module_ext = import_stmt.module_ext
+            module_alias = import_stmt.alias or module_name
 
             try:
                 with open(f"{module_name}.{module_ext}", "r") as f:
@@ -26,13 +24,13 @@ def process_imports(source_text: str) -> str:
                 raise Exception(f"Module {module_name}.{module_ext} not found.")
 
             # Recursively process imports in the module source
-            processed_module_source = process_imports(module_source)
+            processed_module_source = process_imports(module_source, ltc)
 
             # Prefix each function definition with the module name.
             for module_line in processed_module_source.splitlines():
                 if module_line.strip().startswith("define "):
                     func_name = module_line.strip()[len("define "):].split("(")[0].strip()
-                    module_line = module_line.replace(f"define {func_name}", f"define {module_name}.{func_name}")
+                    module_line = module_line.replace(f"define {func_name}", f"define {module_alias}.{func_name}")
                 processed_lines.append(module_line)
         else:
             processed_lines.append(line)

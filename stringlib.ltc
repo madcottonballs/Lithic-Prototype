@@ -1,5 +1,3 @@
-import "strarraylib.ltc";
-
 define read(ptr original) {
     tag(original, char);   /* lets us do ptr indexing */
     let string result;

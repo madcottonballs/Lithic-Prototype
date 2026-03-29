@@ -40,3 +40,40 @@ def lexer(source_text: str):
             token_index += 1
 
     return tokens
+
+class import_statement:
+    def __init__(self, module_name: str, module_ext: str, alias: str | None = None):
+        self.module_name = module_name
+        self.module_ext = module_ext
+        self.alias = alias
+
+def import_lexer(source_line: str) -> list[str]:
+    """A specialized lexer for import statements, which splits on ';' and has the 'as' syntax."""
+    tokens = lexer(source_line)
+    
+    if 'as' in tokens:
+        as_index = tokens.index('as')
+        if as_index == 0 or as_index == len(tokens) - 1:
+            raise Exception("Syntax error in import statement: 'as' cannot be the first or last token.")
+        if tokens[as_index + 1][0] != '"' or tokens[as_index + 1][-1] != '"':
+            raise Exception("Syntax error in import statement: alias must be a string literal.")
+        
+        alias = tokens[as_index + 1].strip('"')
+
+        del tokens[as_index:as_index + 2]  # Remove 'as' and alias from tokens
+    else:
+        alias = None
+
+    if tokens[0] != 'import':
+        raise Exception("Syntax error in import statement: must start with 'import'.")
+    
+    if tokens[1][0] != '"' or tokens[1][-1] != '"':
+        raise Exception("Syntax error in import statement: module name must be a string literal.")
+    module_file = tokens[1].strip('"').split('.')
+    if len(module_file) != 2:
+        raise Exception("Syntax error in import statement: module name must include a file extension.")
+    module_name, module_ext = module_file
+
+    return_obj = import_statement(module_name, module_ext, alias)
+
+    return return_obj

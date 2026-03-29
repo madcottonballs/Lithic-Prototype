@@ -106,14 +106,19 @@ class function(token):
                 return
 
         if len(self.args) > 1:
-            #if self.val == "let":
-
+            # If commas are already stripped (pre-processed args), accept as-is.
+            if not any(isinstance(arg, token) and arg.val == "," for arg in self.args):
+                # If raw tokens remain without commas, this is still a syntax error.
+                if any(isinstance(arg, token) for arg in self.args):
+                    raise ValueError("Expected ',' between function arguments.")
+                return
+            
             # For multiple args the expected shape is:
             # arg0, ",", arg1, ",", arg2, ...
             for i, arg in enumerate(self.args):
                 if i % 2 == 1:
                     if not (isinstance(arg, token) and arg.val == ","):
-                        raise ValueError("Expected ',' between function arguments")
+                        raise ValueError("Expected ',' between function arguments. This error also occurs if you didn't put commas between arguments, or if each argument doesn't resolve to one object. Try moving any operations inside arguments to seperate lines.")
 
             # Keep only actual argument positions and drop commas.
             self.args = [arg for i, arg in enumerate(self.args) if i % 2 == 0]
