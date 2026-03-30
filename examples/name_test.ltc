@@ -1,10 +1,10 @@
-define test(array y) {
-    y[0] = true;
-    return(y);
-}
-define main() {;
-    let array x = [false, true];
-    x = test(x);
-    printf(x);
+import "strarraylib.ltc" as "strarr";
+define main() {
+    printf(">>>");
+    let string user = "5 * 10 + 10";
+    let array test = split(user, " ", false);
+    iterate (i, length(test)) {
+        printf(strarr.read(test[i]));
+    }
     return(0);
 }

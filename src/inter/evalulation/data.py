@@ -449,7 +449,7 @@ def resolve_tag(tokens, i, ltc) -> None:
         ltc.error(f"Variable '{ptr_arg.var_name}' not found for tagging")
     
     ltc.namespace[scope_level][ptr_arg.var_name]["tag"] = type_arg.val # store the tag in the variable's metadata
-    tokens[i] = t.i32(0) # return 0 for success (could also return the pointer itself or the tag if desired)
+    tokens[i] = t.i32(0, ltc) # return 0 for success (could also return the pointer itself or the tag if desired)
 
 def resolve_untag(tokens, i, ltc) -> None:
     """Used for optionally untagging pointers with type information. Type info is stored in variable metadata."""
@@ -522,3 +522,31 @@ def resolve_malloc(tokens, i, ltc) -> None:
     ltc.helper.malloc(arg.val, ltc)
 
     tokens[i] = ltc.t.ptr(ltc.hp) 
+
+def resolve_split(tokens, i, ltc) -> None:
+    t = ltc.t
+    if len(tokens[i].args) != 3:
+        ltc.error("split expects exactly three arguments: split[string], [char] | [array], [boolean])")
+    string_arg = tokens[i].args[0]
+    delimiter_arg = tokens[i].args[1]
+    save_delimiter_arg = tokens[i].args[2]
+    
+    if not isinstance(string_arg, t.string):
+        ltc.error(f"First argument to split must be a string, got {type(string_arg).__name__}")
+    if not isinstance(delimiter_arg, t.string | t.char):
+        ltc.error(f"Second argument to split must be a string or character, got {type(delimiter_arg).__name__}")
+    if not isinstance(save_delimiter_arg, t.boolean):
+        ltc.error(f"Third argument to split must be a boolean, got {type(save_delimiter_arg).__name__}")
+
+    if not save_delimiter_arg.val:
+        split_strings = string_arg.val.split(delimiter_arg.val)
+    
+
+    # arrays cannot hold strings directly, so we store the split strings on the heap and create an array of pointers to them
+    ltc_strings = [t.string(s) for s in split_strings]
+
+    ltc_strings_addresses = [ltc.helper.add_string_to_heap(s, ltc.memory, ltc)[0] for s in ltc_strings] # store the split strings on the heap and get their memory locations
+    
+    ptrs_to_the_strings = [t.ptr(s, ltc) for s in ltc_strings_addresses] # create ptr tokens for the memory locations of the split strings
+
+    tokens[i] = t.array(ptrs_to_the_strings, ltc, arrayType="ptr", parse=False)

@@ -3,6 +3,7 @@
 * Stack mechanism broke the free operator
 * Cannot do indexed string assignment
 * var scoping is broken
+* split() function isn't fully implemented
 
 # Details
 * This is a prototype of a minimalist imperative programming language.
@@ -341,19 +342,31 @@ printf(getTypeTag(px));		/* output: u64
 ###		untag([ptr])
 Removes a type tag from a ptr.
 
-###		*split([string], [char] | [array], [boolean])
+###		split([string], [char] | [array], [boolean])
 Breaks a single string (arg 1) into substrings (stored in a tuple) based on argument 2.
 Argument 2 is either a single char or an array of chars.
 Argument 3 is an optional argument. 
 If arg 3 is false, the split character(s) are not saved among the substrings. If it is true, the split character(s) are saved among the substrings.
+Returns a array of ptr's. The ptr's point to strings. 
 
 If arg 2 is a char, split() looks over the arg 1 string and breaks it up when an instance of that char is found.
 Example:
->let array new = split("hello world", ' ') 		/* 'new' is assigned the tuple: ("hello", "world") */
+>let array new = split("hello world", ' ') 		/* 'new' is assigned the array: [&"hello", &"world"] */
 
 If arg 2 is an array of char's, split() will split up arg 1 whenever it finds any of the chars in the array.
 Example:
->let array new = split("5 + 9 * 10", [' ', '+', '*'], true) 		/* 'new' is assigned the tuple: ("5", " ", "+", " ", "*", " ", "10") */
+>let array new = split("5 + 9 * 10", [' ', '+', '*'], true) 		/* 'new' is assigned the array: [&"5", &" ", &"+", &" ", &"*", &" ", &"10"] */
+###		*index([string], [char] | [string])
+Searches through arg 1 to find matching the first matching char or sub-string (arg 2).
+Returns the index of the first matching sub-string or char as an i32.
+Errors if arg 1 has no matches.
+Ex:
+```
+let string example = "what's up haters";
+let i32 first_h = index(example, 'h');
+```
+In this example, the first 'h' is the 2nd character in the string.
+With start-at-0 indexing, that is index 1. So first_h = 1.
 
 # Control Flow:
 ##	if ([boolean]) { ... }

@@ -171,5 +171,8 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             data.resolve_malloctype(tokens, i, ltc)
         case "cmd":
             cmd.resolve_cmd(tokens, i, ltc)
+        case "split":
+            data.resolve_split(tokens, i, ltc)
+
 
     return return_values

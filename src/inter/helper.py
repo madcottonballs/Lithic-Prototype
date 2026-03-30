@@ -81,9 +81,10 @@ def add_string_to_memory(string, memory, ltc) -> None:
 
 def add_string_to_heap(string, memory, ltc, capacity: int | None = None) -> tuple[int, int]:
     """Write a string to the heap and return (start_addr, capacity)."""
+    
     byte_rep_of_str = string.val.encode('utf-8') + b'\x00'
     needed = len(byte_rep_of_str)
-    alloc = max(needed, capacity or needed)
+    alloc = max(needed, capacity or needed) # if capacity is provided, allocate that much space (or more if needed), otherwise allocate just enough for the string
     start = ltc.hp - alloc
     if start <= ltc.sp:
         ltc.error("Stack and Heap intersect. Out of memory.")

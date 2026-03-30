@@ -50,7 +50,8 @@ class State:
             "untag",
             "getTypeTag",
             "mallocType",
-            "cmd"
+            "cmd",
+            "split"
         ]
         self.types = {
             "string": t.string,

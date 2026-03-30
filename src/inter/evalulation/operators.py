@@ -353,7 +353,7 @@ def resolve_bool_oper(ltc, tokens, i, oper: str, return_values, evaluate, execut
     rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
     if type(lhs).__name__ != type(rhs).__name__:
-        ltc.error(f"Type mismatch in equality operator '{type(lhs).__name__}[{lhs.val}] {oper} {type(rhs).__name__}[{rhs.val}]'")
+        ltc.error(f"Type mismatch in equality operator '{type(lhs).__name__}: {lhs.val} {oper} {type(rhs).__name__}: {rhs.val}'")
 
     match oper:
         case "==":
