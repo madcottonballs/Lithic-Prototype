@@ -526,42 +526,66 @@ def resolve_malloc(tokens, i, ltc) -> None:
 def resolve_split(tokens, i, ltc) -> None:
     t = ltc.t
     if len(tokens[i].args) != 3:
-        ltc.error("split expects exactly three arguments: split[string], [char] | [array], [boolean])")
+        ltc.error("split expects exactly three arguments: split[string], [char] | [array] | [string], [boolean])")
     string_arg = tokens[i].args[0]
     delimiter_arg = tokens[i].args[1]
     save_delimiter_arg = tokens[i].args[2]
     
     if not isinstance(string_arg, t.string):
         ltc.error(f"First argument to split must be a string, got {type(string_arg).__name__}")
-    if not isinstance(delimiter_arg, t.string | t.char | t.array):
+    if not isinstance(delimiter_arg, (t.string, t.char, t.array)):
         ltc.error(f"Second argument to split must be a string, char, or char array, got {type(delimiter_arg).__name__}")
     if not isinstance(save_delimiter_arg, t.boolean):
         ltc.error(f"Third argument to split must be a boolean, got {type(save_delimiter_arg).__name__}")
 
     string: str = string_arg.val
-    delimiter: str = delimiter_arg.val
+    if isinstance(delimiter_arg, t.array):
+        delimiter_arg.parse(ltc)
+        if delimiter_arg.arrayType != "char":
+            ltc.error(f"Argument 2 of split() must either be a string, char, or char array, instead got {delimiter_arg.arrayType} array")
+        delimiter: list = delimiter_arg.val
+        delimiter = [d.val for d in delimiter] # delimiter is a list of char objects, we need to get their str representation
+    else: # either a char or string
+        delimiter: str = delimiter_arg.val
 
     if save_delimiter_arg.val: # save delimiters in the output array if save_delimiter_arg is true
         # this code essentially does split() except saves the delimiter
-        
         split_strings: list[str] = [str()]  # initalize to 1 element of empty str
         idx = 0
         while idx < len(string):
-            end_of_check: int = idx + len(delimiter)  # the idx of the last char in the sub-string we are currently checking
-            if end_of_check > len(string):
-                split_strings[-1] += string[idx:]
-                break
-            
-            if string[idx:end_of_check] == delimiter:
-                split_strings.append(delimiter)
-                split_strings.append(str())
-                idx += len(delimiter)
-            else:
-                split_strings[-1] += string[idx]
-                idx += 1
+            if type(delimiter) == list: # char array                
+                if string[idx] in delimiter:
+                    idx_of_delimiter = delimiter.index(string[idx])
+                    # Avoid empty segments between consecutive delimiters.
+                    if split_strings and split_strings[-1] == "":
+                        split_strings.pop()
+                    split_strings.append(delimiter[idx_of_delimiter])
+                    # Only create a new segment if the next char is not another delimiter.
+                    if idx + 1 < len(string) and string[idx + 1] not in delimiter:
+                        split_strings.append(str())
+                    idx += 1
+                else:
+                    split_strings[-1] += string[idx]
+                    idx += 1
+            else: # string or char
+                end_of_check: int = idx + len(delimiter)  # the idx of the last char in the sub-string we are currently checking
+                if end_of_check > len(string):
+                    split_strings[-1] += string[idx:]
+                    break
+                
+                if string[idx:end_of_check] == delimiter:
+                    if split_strings and split_strings[-1] == "":
+                        split_strings.pop()
+                    split_strings.append(delimiter)
+                    next_idx = idx + len(delimiter)
+                    if next_idx < len(string) and not string.startswith(delimiter, next_idx):
+                        split_strings.append(str())
+                    idx += len(delimiter)
+                else:
+                    split_strings[-1] += string[idx]
+                    idx += 1
     else: # throw away delimiters in the output
         split_strings = string_arg.val.split(delimiter_arg.val) 
-    
 
     # arrays cannot hold strings directly, so we store the split strings on the heap and create an array of pointers to them
     ltc_strings = [t.string(s) for s in split_strings]

@@ -165,6 +165,9 @@ def _build_let_stmts(start_index, tokens, ltc):
     t = ltc.t
     index = start_index
     while index < len(tokens):
+        if type(tokens[index]) is not t.token:
+            index += 1
+            continue
         symbol = getattr(tokens[index], "val", None)
 
         if symbol == "let" and not isinstance(tokens[index], t.function):
@@ -244,6 +247,9 @@ def _build_array_literals(tokens, ltc, start_index=0):
     """Convert `[elem1, elem2, ...]` into one `t.array` token."""
     index = start_index
     while index < len(tokens):
+        if type(tokens[index]) is not ltc.t.token:
+            index += 1
+            continue
         symbol = getattr(tokens[index], "val", None)
         if symbol != "[":
             index += 1
@@ -301,7 +307,7 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
         # If previous token is value-like, sign should be treated as binary.
         if previous_symbol in (")", "]"):
             return False
-        if isinstance(previous_token, (t.integer, t.boolean, t.string, t.char, t.array, t.var_ref, t.ptr, subexp, oper, mono_oper)):
+        if isinstance(previous_token, (t.ltc_type, t.var_ref, subexp, oper, mono_oper)):
             return False
 
         # Non-string previous symbols are value-like (e.g. numeric literals), so treat '+'/'-' as binary.
@@ -312,6 +318,9 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
 
     # Pass 3: build multiplication/division nodes first (higher precedence).
     while index < len(tokens):
+        if type(tokens[index]) is not t.token:
+            index += 1
+            continue
         symbol = getattr(tokens[index], "val", None)
         if symbol == "*":
             next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
@@ -342,6 +351,9 @@ def _build_add_sub_mult_div_nodes(start_index, tokens, ltc):
     index = start_index
     # Pass 4: build addition/subtraction nodes (lower precedence).
     while index < len(tokens):
+        if type(tokens[index]) is not t.token:
+            index += 1
+            continue
         symbol = getattr(tokens[index], "val", None)
         if symbol == "+":
             next_symbol = getattr(tokens[index + 1], "val", None) if index + 1 < len(tokens) else None
@@ -419,12 +431,16 @@ def _resolve_index_token_to_dword(index_token, ltc):
     return resolved_index
 
 def _build_opers(tokens, start_idx, ltc):
+    t = ltc.t
     index = start_idx
     while index < len(tokens):
+        if type(tokens[index]) is not t.token:
+            index += 1
+            continue
         symbol = getattr(tokens[index], "val", None)
         match symbol:
             case "=":
-                _check_oper_syntax_errors('=', tokens, index)
+                _check_oper_syntax_errors(ltc, '=', tokens, index)
 
                 # If previous token is !, <, or >, this '=' belongs to a two-char comparator
                 # and should be handled by that previous operator token.
@@ -443,10 +459,10 @@ def _build_opers(tokens, start_idx, ltc):
 
                 match tokens[index + 1].val: # next token 
                     case "!": # '!!' truthy operator
-                        _check_oper_syntax_errors('!!', tokens, index)
+                        _check_oper_syntax_errors(ltc, '!!', tokens, index)
                         pass
                     case "=": # '!=' not equal to operator
-                        _check_oper_syntax_errors('!=', tokens, index)
+                        _check_oper_syntax_errors(ltc, '!=', tokens, index)
                         build_not_equal_oper(tokens, index, ltc)
                     case _: # '!' boolean invert operator
                         if index + 1 >= len(tokens):
@@ -454,14 +470,14 @@ def _build_opers(tokens, start_idx, ltc):
                         
                         build_invert_oper(tokens, index, ltc)
             case ">":
-                _check_oper_syntax_errors('>', tokens, index)
+                _check_oper_syntax_errors(ltc, '>', tokens, index)
                 next_symbol = getattr(tokens[index + 1], "val", None)
                 if next_symbol == "=":
                     build_greater_equal_oper(tokens, index, ltc)
                 else:
                     build_greater_oper(tokens, index, ltc)
             case "<":
-                _check_oper_syntax_errors('<', tokens, index)
+                _check_oper_syntax_errors(ltc, '<', tokens, index)
                 next_symbol = getattr(tokens[index + 1], "val", None)
                 if next_symbol == "=":
                     build_less_equal_oper(tokens, index, ltc)
@@ -470,23 +486,23 @@ def _build_opers(tokens, start_idx, ltc):
             case "+":
                 match tokens[index + 1].val: # next token 
                     case "=": # '+=' 
-                        _check_oper_syntax_errors('+=', tokens, index)
+                        _check_oper_syntax_errors(ltc, '+=', tokens, index)
                         build_unified_oper_assign(tokens, index, ltc, "+=")
                     case "+": # '++' increment operator
-                        _check_oper_syntax_errors('++', tokens, index)
+                        _check_oper_syntax_errors(ltc, '++', tokens, index)
                         build_var_mod_shortcut_oper(tokens, index, "++", ltc)
                     case _: # '+' add operator
                         pass # handled at a different time
             case "-":
                 match tokens[index + 1].val: # next token 
                     case "=": # '-=' 
-                        _check_oper_syntax_errors('-=', tokens, index)
+                        _check_oper_syntax_errors(ltc, '-=', tokens, index)
                         build_unified_oper_assign(tokens, index, ltc, "-=")
                     case "-": # '--' decrement operator
-                        _check_oper_syntax_errors('--', tokens, index)
+                        _check_oper_syntax_errors(ltc, '--', tokens, index)
                         build_var_mod_shortcut_oper(tokens, index, "--", ltc)
                     case ">": # -> arrow operator for type casting
-                        _check_oper_syntax_errors('->', tokens, index)
+                        _check_oper_syntax_errors(ltc, '->', tokens, index)
                         build_cast_oper(tokens, index, ltc)
                         index -= 1  # re-scan after in-place replacement
                     case _: # '+' add operator
@@ -494,20 +510,20 @@ def _build_opers(tokens, start_idx, ltc):
             case "*":
                 match tokens[index + 1].val: # next token 
                     case "=": # '*=' 
-                        _check_oper_syntax_errors('*=', tokens, index)
+                        _check_oper_syntax_errors(ltc, '*=', tokens, index)
                         build_unified_oper_assign(tokens, index, ltc, "*=")
                     case "*": # '**' exponentiation operator
-                        _check_oper_syntax_errors('**', tokens, index)
+                        _check_oper_syntax_errors(ltc, '**', tokens, index)
                         build_var_mod_shortcut_oper(tokens, index, "**", ltc)
                     case _: # '*' multiply operator
                         pass # handled at a different time
             case "/":
                 match tokens[index + 1].val: # next token 
                     case "=": # '/=' 
-                        _check_oper_syntax_errors('/=', tokens, index)
+                        _check_oper_syntax_errors(ltc, '/=', tokens, index)
                         build_unified_oper_assign(tokens, index, ltc, "/=")
                     case "/": # '//' floor division operator
-                        _check_oper_syntax_errors('//', tokens, index)
+                        _check_oper_syntax_errors(ltc, '//', tokens, index)
                         build_var_mod_shortcut_oper(tokens, index, "//", ltc)
                     case _: # '*' multiply operator
                         pass # handled at a different time
@@ -517,7 +533,7 @@ def _build_opers(tokens, start_idx, ltc):
                 build_memloc_oper(tokens, index, ltc)
         index += 1
 
-def _check_oper_syntax_errors(oper: str, tokens, index):
+def _check_oper_syntax_errors(ltc, oper: str, tokens, index):
     if index + 1 >= len(tokens):
         ltc.error(f"operator `{oper}` must be followed by a value.")
     if index < 1:

@@ -1,8 +1,9 @@
 import "strarraylib.ltc" as "strarr";
+
 define main() {
     printf(">>>");
     let string user = input();
-    let array test = split(user, "the", true);
+    let array test = split(user, ['+', '-', '*', '/', ' '], true);
     printf(concat("the length of the test array is: ", length(test) -> string));
     iterate (i, length(test)) {
         printf(concat("entry ", i -> string, ": ", strarr.read(test[i])));

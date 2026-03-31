@@ -341,9 +341,9 @@ printf(getTypeTag(px));		/* output: u64
 ###		untag([ptr])
 Removes a type tag from a ptr.
 
-###		split([string], [char] | [array], [boolean])
+###		split([string], [char] | [array] | [string], [boolean])
 Breaks a single string (arg 1) into substrings (stored in a tuple) based on argument 2.
-Argument 2 is either a single char or an array of chars.
+Argument 2 is either a single char or an array of chars or a string.
 Argument 3 is an optional argument. 
 If arg 3 is false, the split character(s) are not saved among the substrings. If it is true, the split character(s) are saved among the substrings.
 Returns a array of ptr's. The ptr's point to strings. 
@@ -355,6 +355,11 @@ Example:
 If arg 2 is an array of char's, split() will split up arg 1 whenever it finds any of the chars in the array.
 Example:
 >let array new = split("5 + 9 * 10", [' ', '+', '*'], true) 		/* 'new' is assigned the array: [&"5", &" ", &"+", &" ", &"*", &" ", &"10"] */
+
+If arg 2 is a string, split() will split up arg 1 whenever it finds a match for all the characters in arg 2 within a substring in arg 1.
+Example:
+>let array new = split("whattheworld", "the", true) 		/* 'new' is assigned the array: [&"what", &"the", &"world"] */
+
 ###		*index([string], [char] | [string])
 Searches through arg 1 to find matching the first matching char or sub-string (arg 2).
 Returns the index of the first matching sub-string or char as an i32.
