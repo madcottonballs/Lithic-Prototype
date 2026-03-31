@@ -1,10 +1,11 @@
 import "strarraylib.ltc" as "strarr";
 define main() {
     printf(">>>");
-    let string user = "5 * 10 + 10";
-    let array test = split(user, " ", false);
+    let string user = input();
+    let array test = split(user, "the", true);
+    printf(concat("the length of the test array is: ", length(test) -> string));
     iterate (i, length(test)) {
-        printf(strarr.read(test[i]));
+        printf(concat("entry ", i -> string, ": ", strarr.read(test[i])));
     }
     return(0);
 }

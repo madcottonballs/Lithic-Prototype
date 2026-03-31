@@ -2,7 +2,6 @@
 ## To Do
 * Stack mechanism broke the free operator
 * Cannot do indexed string assignment
-* var scoping is broken
 * split() function isn't fully implemented
 
 # Details
