@@ -56,20 +56,40 @@
 ###    *inlineAsm [string_lit]
         Writes the text entered into the generated Asm file.
 
-###   *file_open [string] [char] -> [file]
-        Opens the file referenced by the string and saves it in the file reference. The mode of the file opening is the char. Valid modes are 'r' for reading and 'w' for write.  
+###   *file_open [string] [string] -> [file]
+        Opens the file referenced by the first string and saves it in the file reference. The mode of the file opening is the 2nd string. Valid modes are "r" for reading and "w" for write.  
 ###   *file_close [file]
         Closes the file, freeing it from your programs memory. The file reference cannot be used in future file operations unless opened again. 
-###   *file_write_all [string] -> [file]
-       Overwrites the content of a file to be the string. 
-###   *file_write_line [string] [integer] -> [file]
-       Overwrites the content of a single line of a file to be the string. The line index is the integer. A line is defined by a newline character. 
+###   *file_write_all [file] [string]
+       Overwrites the content of a file to be the string. File cursor moves to the end of the file after writing. 
+###   *file_write_line [file] [string]
+       Overwrites the content of a single line of a file to be the string. The line index is the file cursor which is implicitly incremented the length of the string by this operation. A line is defined by a newline character. 
+###   *file_write_byte [file] [integer]
+       Writes the content of a single byte of an integer (must be u8 or i8) into a file. The byte index is the file cursor which is implicitly incremented by 1 by this operation.
 ###   *file_read_all [file] -> [var]
        Reads all the contents of a file into a string represented by the var.
-###   *file_read_line [file] [integer] -> [var]
-       Reads the content of a single line of a file into a string represented by the var. The line index is the integer. A line is defined by a newline character. 
+###   *file_read_line [file] -> [var]
+       Reads the content of a single line of a file into a string represented by the var. The line index is the file cursor which is implicitly incremented the length of the string by this operation. A line is defined by a newline character. The newline character is not included in the saved string.
+###   *file_read_byte [file] -> [var]
+       Reads the content of a single byte of a file into a string represented by the var. The byte index is the file cursor which is implicitly incremented by 1 by this operation.
+###   *file_eof [file] -> [var]
+        Checks if the next byte after the file cursor is an EOF (end of file) byte and saves it into the Boolean (represented by the var).
 
-
+###   *file_seek [file] [integer byte_offset] [string whence] -> [var]
+        Whence = "start", "current", "end"
+        Moves the file cursor to a specific byte. If whence is "start", the byte offset is starting from byte 0 of the file. If whence is "end", the byte offset is based around the last byte of the file. If whence is "current", the byte offset is based on the current file cursor. Returns either false or true to the var arg depending on if the operation was successful. 
+###   *file_tell [file] -> [var]   
+        returns current cursor position as an integer to the var. 
+###   *file_line_advance [file] [integer]   
+        moves file cursor forward N lines. String based, not byte based. A line is defined by a newline character. 
+###   *file_line_rewind [file] [integer]    
+        moves file cursor backward N lines. String based, not byte based. A line is defined by the newline character. 
+###   *file_byte_advance [file] [integer]   
+        moves file cursor forward N bytes. 
+###   *file_byte_rewind [file] [integer]    
+        moves file cursor backward N bytes. 
+###   *file_flush [file]
+        Immediately writes all content stored in the file buffer to disk. 
 
 ###     define #[func] [arg_type]
         Opens a function body. 
