@@ -1,3 +1,5 @@
+/* strarrays are arrays of pointers, not a ptr to a array of ptr's *\
+
 /* load: buffer is the text you want to write, idx is the index, arr is a ptr to the array string array */
 define load(string buffer, i32 idx, ptr arr) {
     /* pass in a ptr to the ptr array*/
