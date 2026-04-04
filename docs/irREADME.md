@@ -5,6 +5,7 @@
 ###     "[str_lit]"
 ###     '[char_lit]'
 ###     |[bool_lit]
+###.    ![file]
 ###     %[var]
         Always use when you're referencing a var.
 ###     #[func]
@@ -54,6 +55,20 @@
         Writes the text entered into the generated C++ file.
 ###    *inlineAsm [string_lit]
         Writes the text entered into the generated Asm file.
+
+###   *file_open [string] [char] -> [file]
+        Opens the file referenced by the string and saves it in the file reference. The mode of the file opening is the char. Valid modes are 'r' for reading and 'w' for write.  
+###   *file_close [file]
+        Closes the file, freeing it from your programs memory. The file reference cannot be used in future file operations unless opened again. 
+###   *file_write_all [string] -> [file]
+       Overwrites the content of a file to be the string. 
+###   *file_write_line [string] [integer] -> [file]
+       Overwrites the content of a single line of a file to be the string. The line index is the integer. A line is defined by a newline character. 
+###   *file_read_all [file] -> [var]
+       Reads all the contents of a file into a string represented by the var.
+###   *file_read_line [file] [integer] -> [var]
+       Reads the content of a single line of a file into a string represented by the var. The line index is the integer. A line is defined by a newline character. 
+
 
 
 ###     define #[func] [arg_type]
