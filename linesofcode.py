@@ -14,17 +14,20 @@ def count_code_lines_in_file(file_path: Path) -> int:
             count += 1
     return count
 
-
-def main() -> None:
-    root = Path(__file__).resolve().parent
+def read_python_files(root: Path) -> int:
     total = 0
-
     for file_path in root.rglob("*.py"):
         if any(part in {"__pycache__", ".git"} for part in file_path.parts):
             continue
         total += count_code_lines_in_file(file_path)
+    return total
 
-    print(total)
+def main() -> None:
+    root = Path(__file__).resolve().parent
+    total = read_python_files(root)
+
+
+    print(f"total: {total} lines of Python code")
 
 
 if __name__ == "__main__":

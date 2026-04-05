@@ -1,7 +1,4 @@
-import os
-
-
-def ltc_print(ltc, tokens, i) -> None:
+def ltc_printf(ltc, tokens, i) -> None:
     t = ltc.t
     if len(tokens[i].args) != 1:
         ltc.error("printf() expects exactly one argument")
@@ -19,6 +16,18 @@ def ltc_print(ltc, tokens, i) -> None:
     else:
         ltc.error(f"Unsupported argument type for printf(): {type(arg).__name__}")
     tokens[i] = t.i32(0, ltc)
+
+def ltc_print(ltc, tokens, i) -> None:
+    t = ltc.t
+    if len(tokens[i].args) != 1:
+        ltc.error("printf() expects exactly one argument")
+    arg = tokens[i].args[0]
+    if isinstance(arg, t.string | t.char):
+        print(arg.val, end="")
+    else:
+        ltc.error(f"Unsupported argument type for print(): {type(arg).__name__}")
+    tokens[i] = t.i32(0, ltc)
+
 
 def ltc_input(tokens, i, ltc) -> None:
     t = ltc.t

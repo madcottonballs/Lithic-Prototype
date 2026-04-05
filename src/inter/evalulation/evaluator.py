@@ -110,7 +110,7 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
     n = ltc.n
     match tokens[i].val:
         case "printf":
-            cmd.ltc_print(ltc, tokens, i)
+            cmd.ltc_printf(ltc, tokens, i)
         case "let":
             data.resolve_let(tokens, i, ltc)
         case "input":
@@ -173,6 +173,8 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             cmd.resolve_cmd(tokens, i, ltc)
         case "split":
             data.resolve_split(tokens, i, ltc)
+        case "print":
+            cmd.ltc_print(ltc, tokens, i)
 
 
     return return_values

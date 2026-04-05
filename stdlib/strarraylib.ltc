@@ -22,3 +22,12 @@ define read(ptr original) {
     return(result);
 }
 
+define printa(ptr arr) {
+    tag(arr, ptr);   /* lets us do ptr indexing */
+    let i32 i;
+    while (arr[i] != 0) {
+        print(read(arr[i]));
+        i += 1;
+    }
+    return(0);
+}

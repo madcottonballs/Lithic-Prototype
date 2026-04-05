@@ -51,7 +51,8 @@ class State:
             "getTypeTag",
             "mallocType",
             "cmd",
-            "split"
+            "split",
+            "print"
         ]
         self.types = {
             "string": t.string,

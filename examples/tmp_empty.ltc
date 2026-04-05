@@ -1,2 +1,5 @@
 define main() {
+    print("hell");
+    printf(split("Hello Jack and Andrew", "and", true));
+    return(0);
 }
