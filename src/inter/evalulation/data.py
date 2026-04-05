@@ -1,3 +1,6 @@
+def _type_ref(ltc, token, typeref: str) -> bool:
+    return isinstance(token, ltc.t.token) and token.val == typeref
+
 def resolve_let(tokens, i, ltc) -> None:
     t = ltc.t
     helper = ltc.helper
@@ -11,10 +14,12 @@ def resolve_let(tokens, i, ltc) -> None:
 
     if not isinstance(var_name_arg, t.token):
         ltc.error("Second argument to let must be a variable name token")
+    if var_name_arg.val in ltc.reserved_keywords:
+        ltc.error(f"Variable name '{var_name_arg.val}' is a reserved keyword")
 
     var_mem_addr = ltc.sp
 
-    if let_type == 4:
+    if let_type == 4: # let with initializer, example: let i32 x = 5;
         equals_arg = tokens[i].args[2]
         var_value_arg = tokens[i].args[3]
 
@@ -31,7 +36,7 @@ def resolve_let(tokens, i, ltc) -> None:
             # vars stored for unified meta data reconstruction at end
             array_type = var_type_arg.arrayType
             array_length = var_type_arg.get_size()
-        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "array":
+        elif _type_ref(ltc, var_type_arg, "array"):
             if not isinstance(var_value_arg, t.array):
                 ltc.error("let array expects an array literal or array value on the right hand side")
             # Ensure array literal is parsed so arrayType is inferred.
@@ -41,36 +46,41 @@ def resolve_let(tokens, i, ltc) -> None:
                 ltc.error("let array expects a non-empty array literal so element type can be inferred")
             helper.load_to_mem(ltc, var_value_arg, "array")
             array_length = var_value_arg.get_size()
-        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "string":
+        elif _type_ref(ltc, var_type_arg, "string"):
             # Store strings on heap to avoid stack lifetime issues.
             string_copy = t.string(var_value_arg.val)
             var_mem_addr, capacity = helper.add_string_to_heap(string_copy, ltc.memory, ltc)
+        elif _type_ref(ltc, var_type_arg, "file"):
+            pass # file variables aren't stored in virtual memory, so no need to load an initial value
         else:
             helper.load_to_mem(ltc, var_value_arg, var_type_arg.val)
-    else:
-        if isinstance(var_type_arg, t.array):
+    else:  # let without initializer, example: let i32 x;
+        if isinstance(var_type_arg, t.array): # for uninitialized arrays, we still need to parse the type to get the arrayType and size info
             empty_array = t.array([], ltc, arrayType=var_type_arg.arrayType, parse=False)
             empty_array.size = var_type_arg.size
             helper.load_to_mem(ltc, empty_array, "array")
             # vars stored for unified meta data reconstruction at end
             array_type = var_type_arg.arrayType
             array_length = var_type_arg.size
-        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "array":
+        elif _type_ref(ltc, var_type_arg, "array"):
             ltc.error("let array requires an initializer; use let array x = [..];")
-        elif isinstance(var_type_arg, t.token) and var_type_arg.val == "string":
+        elif _type_ref(ltc, var_type_arg, "string"):
             # Empty strings start on the stack; they'll migrate to heap if they grow.
             helper.load_to_mem(ltc, t.string(""), "string")
+        elif _type_ref(ltc, var_type_arg, "file"):
+            ltc.error("let file requires an initializer; use let file f = open(...);")
         else:
             helper.load_to_mem(ltc, helper.recieve_empty_form(ltc, var_type_arg.val), var_type_arg.val)
     
-    if isinstance(var_type_arg, t.array) or (isinstance(var_type_arg, t.token) and var_type_arg.val == "array"):
+    # handle tracking in the namespace
+    if isinstance(var_type_arg, t.array) or _type_ref(ltc, var_type_arg, "array"):
         ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
             "type": "array",
             "addr": var_mem_addr,
             "length": array_length,
             "elem_type": array_type,
         }
-    elif isinstance(var_type_arg, t.ltctuple) or (isinstance(var_type_arg, t.token) and var_type_arg.val == "tuple"):
+    elif isinstance(var_type_arg, t.ltctuple) or _type_ref(ltc, var_type_arg, "tuple"):
         tuple_element_types = None
         if isinstance(var_type_arg, t.ltctuple):
             tuple_element_types = var_type_arg.element_types
@@ -84,6 +94,15 @@ def resolve_let(tokens, i, ltc) -> None:
             "type": "tuple",
             "addr": var_mem_addr,
             "element_types": tuple_element_types,
+        }
+    elif isinstance(var_type_arg, t.file) or _type_ref(ltc, var_type_arg, "file"):
+        ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
+            "type": "file",
+            "addr": var_mem_addr,
+# file variables also track the mode they were opened with in their metadata, which is initially None until the file is opened. This hasattr implementation allows for both initialized and uninitialized file variables to be declared without error, since only initialized file variables will have a mode attribute on their value object.            
+            "mode": var_value_arg.mode if hasattr(var_value_arg, 'mode') else None, 
+            "contents": var_value_arg.contents if hasattr(var_value_arg, 'contents') else None, # for read mode files, we can store the file contents in memory for easy access. This is initially None until the file is opened and read from, at which point the contents will be stored here for future reference. This allows for multiple reads from the same file variable without needing to access the filesystem multiple times.
+            "cursor": var_value_arg.cursor if hasattr(var_value_arg, 'cursor') else 0, # for read and write mode files, we track the cursor position in the file so that subsequent read/write operations know where to read from/write to in the file. This is initially None until the file is opened, at which point it will be set to 0 to indicate the start of the file. For read mode files, the cursor will move forward as we read through the contents string. For write mode files, the cursor will move forward as we write new data to the file (for simplicity, we treat the file contents as a single string and just insert new data at the cursor position).
         }
     else: # generic case for primitives and other types
         entry = {
@@ -587,11 +606,4 @@ def resolve_split(tokens, i, ltc) -> None:
     else: # throw away delimiters in the output
         split_strings = string_arg.val.split(delimiter_arg.val) 
 
-    # arrays cannot hold strings directly, so we store the split strings on the heap and create an array of pointers to them
-    ltc_strings = [t.string(s) for s in split_strings]
-
-    ltc_strings_addresses = [ltc.helper.add_string_to_heap(s, ltc.memory, ltc)[0] for s in ltc_strings] # store the split strings on the heap and get their memory locations
-    
-    ptrs_to_the_strings = [t.ptr(s, ltc) for s in ltc_strings_addresses] # create ptr tokens for the memory locations of the split strings
-
-    tokens[i] = t.array(ptrs_to_the_strings, ltc, arrayType="ptr", parse=False)
+    tokens[i] = ltc.helper.create_string_array(ltc, split_strings)

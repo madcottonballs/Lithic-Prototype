@@ -3,6 +3,7 @@
 from evalulation.operators import *
 import evalulation.cmd as cmd
 import evalulation.data as data
+import evalulation.fileio as fileio
 
 def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
     """Load user-function arguments into the current frame namespace."""
@@ -176,5 +177,29 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
         case "print":
             cmd.ltc_print(ltc, tokens, i)
 
+        case "open":
+            fileio.resolve_open(tokens, i, ltc)
+        case "read":
+            fileio.resolve_read(tokens, i, ltc)
+        case "readLine":
+            fileio.resolve_readline(tokens, i, ltc)
+        case "advanceByte":
+            fileio.resolve_advanceByte(tokens, i, ltc)
+        case "advanceLine":
+            fileio.resolve_advanceLine(tokens, i, ltc)
+        case "rewindByte":
+            fileio.resolve_rewindByte(tokens, i, ltc)
+        case "rewindLine":
+            fileio.resolve_rewindLine(tokens, i, ltc)
+        case "getCursor":
+            fileio.resolve_getCursor(tokens, i, ltc)
+        case "readLines":
+            fileio.resolve_readlines(tokens, i, ltc)
+        case "readByte":
+            fileio.resolve_readbyte(tokens, i, ltc)
+        case "readBytes":
+            fileio.resolve_readbytes(tokens, i, ltc)
+        case "atEOF":
+            fileio.resolve_atEOF(tokens, i, ltc)
 
     return return_values

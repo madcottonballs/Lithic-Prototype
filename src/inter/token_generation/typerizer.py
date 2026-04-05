@@ -10,6 +10,14 @@ class ltc_type(token):  # base class for all LTC data types. This is used to dis
         self.inmemory = False
         self.memloc = None
 
+class file(ltc_type):
+    def __init__(self, val):
+        # val is the file path as a string.
+        super().__init__(val)
+        self.mode = None
+        self.contents = None # contents is a str.
+        self.cursor = 0 # cursor tracks where we are in the file for read/write operations. For read operations, this will determine what part of the contents string is returned. For write operations, this will determine where new data is written in the file (for simplicity, we will treat the file contents as a single string and just insert new data at the cursor position).
+
 class string(ltc_type):
     def __init__(self, val):
         super().__init__(val)

@@ -23,49 +23,49 @@
 ##	arithmatic
 * Pointer arithmatic is fully supported. Because pointers don't tell what they're pointing to, pointer arithmatic is byte-based, not type-based like in C.
 
-###		[integer] + [integer]
+###		integer + integer
 Add operator adds the values of the numbers together.
-###		[integer] - [integer]
+###		integer - integer
 Sub operator subtracts the right number from the left.
-###		[integer] * [integer]
+###		integer * integer
 Multiply operator multiplies the values of the numbers together.
-###		[integer] / [integer]
+###		integer / integer
 Divide operator divides the value of the left by the right.
 
-###		[integer var_ref] += [integer]
+###		integer_var += integer
 Addition assignment operator adds the right number to the value of the variable of an integer type.
-###		[integer var_ref] -= [integer]
+###		integer_var -= integer
 Subtraction assignment operator subtracts the right number from the value of the variable of an integer type.
-###		[integer var_ref] *= [integer]
+###		integer_var *= integer
 Multiplication assignment operator multiplies the right number with the value of the variable of an integer type.
-###		[integer var_ref] /= [integer]
+###		integer_var /= integer
 Division assignment operator divides the right number from the value of the variable of an integer type.
 
-###		[integer var_ref]++
+###		integer_var++
 Increment operator adds 1 to the variable of an integer type.
 Ex: 
 >x++
-###		[integer var_ref]--
+###		integer_var--
 Decrement operator subtracts 1 from the variable of an integer type.
 Ex: 
 >x--
-###		[integer var_ref]**
+###		integer_var**
 Double operator multiplies the variable of an integer type by 2.
 Ex:
 >x**
-###		[integer var_ref]//
+###		integer_var//
 Halve operator divides the variable of an integer type by 2.
 Ex: 
 >x//
-###		*[array[integer]] $ [operator] [integer]
+###		*array $ operator integer
 Applies the operation to every number in the array.
 Ex: 
 >x $ * 5 /* every i32 in the array 'x' is multiplied by 5 */
 ##	logical:
-###		![boolean]
+###		!Boolean
 Inverts the boolean. false becomes true, true becomes false.
 ##	pointers:
-###		@([ptr], [type], [idx])
+###		@(ptr, [type], integer idx)
 Dereferences a ptr.
 The type argument specifies the type of the object the ptr is referencing.
 The idx argument is used to specify how many objects of the type specified to jump over.
@@ -80,7 +80,7 @@ let ptr temp = mallocType(i32, 5);
 @(temp, i32, 0) = 30;
 @(temp, i32, 1) = 50;
 ```
-###		&[any]
+###		&any
 Memloc operator.
 Retrieves the address of the object in memory.
 In the interpreter, will only work on data stored in memory (like variables), not literals.
@@ -90,15 +90,15 @@ let i32 x = 5;
 let ptr y = &x;
 ```
 ##	misc:
-###		[any] -> [type]
+###		any -> [type]
 Cast operator converts the first obj into the type referenced.
 Ex: 
 >5 -> string		/* where 5 is a i32, then turns into a string */
-###		*[integer]~[integer]
+###		*integer~integer
 Random operator returns a random number in range of the first i32 and second i32 (inclusive).
 Ex: 
 >5~9		/* randomly selects either 5, 6, 7, 8, or 9 */
-###		[var_ref]^
+###		var^
 Deletes the variable from namespace.
 Memory is not freed, just the variable pointer to it.
 Returns x's last value.
@@ -111,7 +111,7 @@ Unformatted print. Sends the text entered to the terminal, with no extra charact
 Ex: 
 >print('hello world\n'); 
 
-###		printf([string | char | i32 | array | boolean], [char])
+###		printf([string | char | i32 | array | boolean], char)
 Formatted print. Sends the text entered to the terminal. 
 Default end character automatically attached is the newline character.
 To change end character, pass in an optional 2nd argument.
@@ -128,24 +128,24 @@ Ex:
 printf( input() );
 /* This example will display the text the user just entered. */
 ```
-###		cmd([string])
+###		cmd(string)
 Runs the entered string as a command prompt in the terminal.
 ##	Inline:
-###		*inline_C([string])
+###		*inline_C(string)
 Adds the string you enter as a line in the intermeddiate generated C file.
 Only works in translator versions that have C in the pipeline (compiler version).
 
-###		*inline_IR([string])
+###		*inline_IR(string)
 Adds the string you enter as a line in the intermeddiate generated C file.
 Only works in translator versions that have the IR in the pipeline (interpreter version).
 
-###		*inline_Asm([string])
+###		*inline_Asm(string)
 Adds the string you enter as a line in the intermeddiate generated Asm file.
 Only works in translator versions that have Asm in the pipeline (compiler version).
 ##	Misc:
-###		exit([integer])
+###		exit(integer)
 Immediantly ends the program and returns the number as the exit code.
-###		import [string]
+###		import string
 Inlines the code in the .ltc file referenced by the string.
 All functions in the imported file will have their named prefixed by the filename. 
 Ex:
@@ -168,19 +168,19 @@ define main() {
 }
 ```
 ##	Data:
-###		aSet([array], [integer], [any])
+###		aSet(array, integer, any)
 Indexed array element reassignment.
 The first argument is a reference to a array.
 The second argument is the index of where the new value must replace existing data.
 The third argument is the new object replacing the old. 
 * Tuples
-###		tSet([tuple], [integer], [any])
+###		tSet(tuple, integer, any)
 Indexed tuple element reassignment.
 The first argument is a reference to a tuple.
 The second argument is the index of where the new value must replace existing data.
 The third argument is the new object replacing the old. 
 The new object must have the same type as the element in the tuple.
-###		concat([array | tuple | string], [array | tuple | string])
+###		concat(array | tuple | string, array | tuple | string)
 Unified concat() function. 
 Arrays:
 All arguments must be arrays.
@@ -212,7 +212,7 @@ Returns the number (i32) of elements in the tuple passed in.
 Arrays:
 Returns the number (i32) of elements in the array passed in.
 
-###		let [type] [var_ref] = [value]
+###		let [type] var = [value]
 Creates a new variable of the type specified in argument 1 with the name specified in argument 2.
 Optionally assigns it a value with argument 3.
 To only initalize without assignment, do not include "= [value]".
@@ -221,17 +221,17 @@ Exs:
 let i32 x = 5;
 let array y = [5, 2, 9];
 ```
-###		typeof([any])
+###		typeof(any)
 You can enter anything into this function.
 Some things may work, some may not.
 Will return the type of the data types as a string.
 
-###		sizeof([any])
+###		sizeof(any)
 Will return the byte size of each data type as a i32.
 You can pass in any type or a type reference.
 Ex:
 >sizeof(5)	/* This example would return 4, because i32's have a byte size of 4. */
-###		cast([any], [type])
+###		cast(any, [type])
 Equivalent to the cast operator.
 Cast function converts the first obj into the type referenced.
 Ex: 
@@ -292,7 +292,7 @@ casting to ptr:
 		All characters in the string must be a digit.
 		For example, the string "273" can turn to a u64 (and so can be a ptr), but the string "hello" cannot turn to a ptr type.
 
-### 	malloc([i32])
+### 	malloc(i32)
 Reserves a block of memory in the heap for the programmer to use.
 The size of this new memory is determined by the argument passed in.
 Returns a ptr to the first byte of this block.
@@ -301,7 +301,7 @@ Ex:
 >let ptr x = malloc(5);
 This reserves 5 bytes for the programmer to use, x is a ptr to the first byte.
 
-###		mallocType([type], [i32])
+###		mallocType([type], i32)
 Reserves a block of memory in the heap for the programmer to use.
 The size of this new memory is (sizeof(type) * arg_2).
 Returns a ptr to the first byte of this block.
@@ -314,7 +314,7 @@ This reserves five i32's (20 bytes) for the programmer to use, x is a ptr to the
 In interprter version, currently prints the sp and virtual memory contents.
 Will eventually dump to a *file in both versions.
 
-###		tag([ptr], [type])
+###		tag(ptr, [type])
 Lets the interpreter/compiler know a ptr variable references a specific type.
 This lets you do ptr derefencing without specifying type everytime.
 This is totally optional.
@@ -327,7 +327,7 @@ tag(px, i32)						/* px always refers to a i32 now */
 px[0] = 20;							/* no need to specify how many bytes like in raw syntax */
 px[3] = 939;						/* equivalent to @(px, i32, 3) = 939; */
 ```
-###		getTypeTag([ptr])
+###		getTypeTag(ptr)
 Returns a token containing the type the ptr variable is tagged with.
 Will throw an error if the ptr variable is untagged.
 Ex:
@@ -338,10 +338,10 @@ px[46] = 29472319;
 printf(getTypeTag(px));		/* output: u64
 ```
 
-###		untag([ptr])
+###		untag(ptr)
 Removes a type tag from a ptr.
 
-###		split([string], [char] | [array] | [string], [boolean])
+###		split(string, char | array | string, Boolean)
 Breaks a single string (arg 1) into substrings (stored in a tuple) based on argument 2.
 Argument 2 is either a single char or an array of chars or a string.
 Argument 3 is an optional argument. 
@@ -360,7 +360,7 @@ If arg 2 is a string, split() will split up arg 1 whenever it finds a match for 
 Example:
 >let array new = split("whattheworld", "the", true) 		/* 'new' is assigned the array: [&"what", &"the", &"world"] */
 
-###		*index([string], [char] | [string])
+###		*index(string, char | string)
 Searches through arg 1 to find matching the first matching char or sub-string (arg 2).
 Returns the index of the first matching sub-string or char as an i32.
 Errors if arg 1 has no matches.
@@ -371,15 +371,40 @@ let i32 first_h = index(example, 'h');
 ```
 In this example, the first 'h' is the 2nd character in the string.
 With start-at-0 indexing, that is index 1. So first_h = 1.
+##	File IO:
+###		open(string name, string mode) -> file
+Creates a file buffer.
+This function can either read (enter "r" into the mode arg) or write (enter "w" into the mode arg) to the file buffer.
+The file buffer will need to be flushed before any changes appear on disk.
+The file buffer will need to be closed eventually.
+The name arg specifies which file to open.
+example:
+>let file f = open("example.txt", "r");
+###		read(file | string name) -> string
+read() takes either a file object in read mode or a string.
+If a string is entered, it is treated as a path to the file you want to read from.
+It will read all the raw contents of the file into a single string, then close the file automatically.
+If a file object is entered, it reads the already pre-loaded data into a string for you to use. 
+The file object must have been opened in read mode.
+###		advanceLine(file alias, integer lines)
+Increments the cursor of the file object entered by the line argument.
+###		advanceByte(file alias, integer bytes)
+Increments the cursor of the file object entered by the bytes argument.
+###		rewindLine(file alias, integer lines)
+Decrements the cursor of the file object entered by the line argument.
+###		rewindByte(file alias, integer bytes)
+Decrements the cursor of the file object entered by the bytes argument.
+###		getCursor(file alias) -> u32
+Returns the file cursor of the file object as a u32.
 
 # Control Flow:
-##	if ([boolean]) { ... }
+##	if (Boolean) { ... }
 If the boolean resolves to true, the code inside the brackets is run.
 If the boolean resolves to false, the code inside the brackets is skipped.
 ##	else { ... }
 If the above if-statement boolean resolves to true, the code inside the else-brackets does not run.
 If the if-statement boolean resolves to false, the code inside the else-brackets runs.
-##	iterate ([var_ref], [i32]) { ... }
+##	iterate (var, i32) { ... }
 Implictly creates a new variable of type i32 based on argument 1.
 Implictly adds 1 to this variable per loop.
 Implictly checks if the variable is less than the 2nd argument every loop.
@@ -417,7 +442,7 @@ while (x < 5) {
 	4
 	/*		
 ```
-##	for ([let statement], [boolean], [var_ref][operator]) { ... }
+##	for ([let statement], Boolean, var[operator]) { ... }
 Creates a new variable based on the let statement in the first argument.
 Loops over the code in the block until the boolean is false.
 Runs the operator on the variable referenced in the third argument during every pass.
@@ -533,6 +558,8 @@ Ex:
 let i32[3] x;		/* creates an array 'x' of size 3 and type i32 */
 ## tuple
 Fixed-sized immutable continous memory structure that can hold primitive types.
+## file
+File buffer.
 
 ##	*label
 Named line of code.

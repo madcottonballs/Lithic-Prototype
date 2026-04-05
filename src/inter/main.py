@@ -52,7 +52,26 @@ class State:
             "mallocType",
             "cmd",
             "split",
-            "print"
+            "print",
+            
+            "read",
+            "readLines",
+            "readLine",
+            "readByte",
+            "readBytes",
+            "write",
+            "writeLine",
+            "writeByte",
+            "advanceByte",
+            "advanceLine",
+            "rewindByte",
+            "rewindLine",
+            "setCursor",
+            "getCursor",
+            "atEOF",
+            "open",
+            "close",
+            "flush",
         ]
         self.types = {
             "string": t.string,
@@ -69,7 +88,40 @@ class State:
             "u16": t.u16,
             "ptr": t.ptr,
             "tuple": t.ltctuple,
+            "file": t.file,
         }
+        self.reserved_keywords = set(
+            [
+                # control flow
+                "define",
+                "if",
+                "else",
+                "while",
+                "for",
+                "iterate",
+                # literals
+                "true",
+                "false",
+                # types
+                "string",
+                "i32",
+                "boolean",
+                "array",
+                "char",
+                "i64",
+                "i8",
+                "i16",
+                "u32",
+                "u64",
+                "u8",
+                "u16",
+                "ptr",
+                "tuple",
+                "file",
+                # operators-as-keywords
+                "not",
+            ]
+        )
         self.primitives = ( # all supported array element types
             "char",
             "i32",
@@ -144,6 +196,8 @@ def _parse_function_declaration(source_text: str, def_index: int, ltc: State) ->
     function_name = source_text[name_start:name_end].strip()
     if not function_name:
         ltc.error("Expected function name after define")
+    if function_name in ltc.reserved_keywords:
+        ltc.error(f"Function name '{function_name}' is a reserved keyword")
 
     header_open_index = helper.skip_whitespace(source_text, name_end)
     if header_open_index >= len(source_text) or source_text[header_open_index] != "(":
@@ -165,6 +219,8 @@ def _parse_function_declaration(source_text: str, def_index: int, ltc: State) ->
                 ltc.error("Invalid argument declaration in function header")
             arg_types.append(pieces[0])
             arg_names.append(pieces[1])
+            if arg_names[-1] in ltc.reserved_keywords:
+                ltc.error(f"Argument name '{arg_names[-1]}' is a reserved keyword")
 
     block_open_index = helper.skip_whitespace(source_text, header_close_index + 1)
     if block_open_index >= len(source_text) or source_text[block_open_index] != "{":

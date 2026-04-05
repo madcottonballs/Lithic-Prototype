@@ -469,6 +469,10 @@ def _build_opers(tokens, start_idx, ltc):
                             ltc.error("operator `!` must be followed by a value.")
                         
                         build_invert_oper(tokens, index, ltc)
+            case "not":
+                if index + 1 >= len(tokens):
+                    ltc.error("operator `not` must be followed by a value.")
+                build_invert_oper(tokens, index, ltc)
             case ">":
                 _check_oper_syntax_errors(ltc, '>', tokens, index)
                 next_symbol = getattr(tokens[index + 1], "val", None)

@@ -5,7 +5,7 @@
 ###     "[str_lit]"
 ###     '[char_lit]'
 ###     |[bool_lit]
-###.    ![file]
+###     ![file]
 ###     %[var]
         Always use when you're referencing a var.
 ###     #[func]

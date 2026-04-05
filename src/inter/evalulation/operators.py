@@ -373,10 +373,8 @@ def resolve_bool_oper(ltc, tokens, i, oper: str, return_values, evaluate, execut
 
 def resolve_invert_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
     t = ltc.t
-    rhs = tokens[i].node
     helper = ltc.helper
-
-    helper.resolve_node(rhs, ltc, return_values, evaluate, execute_source_fn)
+    rhs = helper.resolve_node(tokens[i].node, ltc, return_values, evaluate, execute_source_fn)
 
     if not isinstance(rhs, t.boolean):
         ltc.error("Invert operator only inverts a boolean. To use truthiness, try using truthy operator ('!!').")

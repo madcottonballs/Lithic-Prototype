@@ -1,5 +1,9 @@
+import "strarraylib.ltc" as "strarr";
 define main() {
-    print("hell");
-    printf(split("Hello Jack and Andrew", "and", true));
+    let file f = open("test.txt", "r");
+
+    while (not atEOF(f)) {
+        printf(readByte(f));
+    }
     return(0);
 }

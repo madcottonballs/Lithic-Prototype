@@ -1,0 +1,4 @@
+define main() {
+    let i32 not = 5;
+    return(0);
+}

@@ -301,6 +301,8 @@ def parse_iterate_block(source_text: str, iterate_index: int, ltc) -> tuple[str,
         ltc.error("iterate first value must be a valid variable name")
     if not all(ch.isalnum() or ch == "_" for ch in iterator_name):
         ltc.error("iterate variable name contains invalid characters")
+    if iterator_name in ltc.reserved_keywords:
+        ltc.error(f"iterate variable name '{iterator_name}' is a reserved keyword")
 
     end_text = header_parts[1].strip()
     #if not end_text.isdigit():
@@ -410,6 +412,15 @@ def dereference_var(ltc, var_ref_token) -> object:
         case "tuple":
             element_types = var_meta["element_types"]
             return t.ltctuple.read_from_memory(addr, element_types, ltc) # returns the ltctuple obj
+        case "file":
+            contents = var_meta["contents"]
+            mode = var_meta["mode"]
+            file_obj = t.file(var_ref_token.val)
+            file_obj.contents = contents
+            file_obj.mode = mode
+            file_obj.cursor = var_meta.get("cursor", 0)
+            file_obj.var_name = var_ref_token.val
+            return file_obj
         case _:
             ltc.error(f"Unsupported variable type: {var_type}")
 
@@ -643,3 +654,14 @@ def read_ltc_type_from_mem(memory, addr, type_str, ltc):
             else:
                 ltc.error(f"Unsupported type for reading from mem: {type_str}")
 
+def create_string_array(ltc, strings):
+    """Takes in a list of str and returns a ltc.array of ptr to the ltc.Strings loaded"""
+    t = ltc.t
+    # arrays cannot hold strings directly, so we store the split strings on the heap and create an array of pointers to them
+    ltc_strings = [t.string(s) for s in strings]
+
+    ltc_strings_addresses = [add_string_to_heap(s, ltc.memory, ltc)[0] for s in ltc_strings] # store the split strings on the heap and get their memory locations
+    
+    ptrs_to_the_strings = [t.ptr(s, ltc) for s in ltc_strings_addresses] # create ptr tokens for the memory locations of the split strings
+
+    return t.array(ptrs_to_the_strings, ltc, arrayType="ptr", parse=False)
