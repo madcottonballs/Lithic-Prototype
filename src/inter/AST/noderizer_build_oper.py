@@ -12,7 +12,8 @@ def build_subexp(start_idx, tokens, ltc):
             helper.find_closing_parenthesis(index, tokens, n.subexp, ltc)
             # `tokens[index]` is now the new `subexp` at this position.
             n.generate_trees(tokens[index].val, ltc, 0)  # recursively generate trees for the contents of the parentheses
-            previous_symbol = getattr(tokens[index - 1], "val", None)
+            
+            previous_symbol = tokens[index - 1].val
             if isinstance(previous_symbol, str) and previous_symbol in ltc.function_names and not isinstance(tokens[index - 1], t.function):
                 # This is a function call with parentheses already collapsed into a `subexp`.
                 # Convert it into a function node and keep only that node.
@@ -27,7 +28,7 @@ def build_subexp(start_idx, tokens, ltc):
                 tokens[index - 1] = t.function(tokens[index - 1].val, arguments, ltc)
                 del tokens[index]
                 index -= 1
-            if isinstance(previous_symbol, str) and previous_symbol in ltc.user_functions and not isinstance(tokens[index - 1], t.user_function):
+            elif isinstance(previous_symbol, str) and previous_symbol in ltc.user_functions and not isinstance(tokens[index - 1], t.user_function):
                 # This is a user_function call with parentheses already collapsed into a `subexp`.
                 # Convert it into a user_function node and keep only that node.
                 arguments = tokens[index].val
@@ -41,6 +42,8 @@ def build_subexp(start_idx, tokens, ltc):
                 tokens[index - 1] = t.user_function(tokens[index - 1].val, arguments, ltc)
                 del tokens[index]
                 index -= 1
+            else:
+                print(previous_symbol)
         index += 1
 
 def build_assign_oper(tokens, index, ltc):
@@ -249,3 +252,17 @@ def build_memloc_oper(tokens, index, ltc):
     
     new_node = n.memloc(tokens[index + 1])
     tokens[index:index + 2] = [new_node]
+
+def build_dot_oper(tokens, index, ltc):
+    lhs = tokens[index-1]
+    rhs = tokens[index+1]
+
+    if lhs.val in ltc.aliases: # means this is a library function call e.g.: strarr.load()
+
+        lhs = ltc.t.token(lhs.val + "." + rhs.val)
+        tokens[index - 1:index + 2] = [lhs]
+
+    else: # this means its a struct.attr e.g.: player.x
+
+        new_node = n.dot_oper(tokens[index - 1], tokens[index + 1])
+        tokens[index - 1:index + 2] = [new_node]

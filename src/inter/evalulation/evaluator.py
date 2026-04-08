@@ -54,7 +54,7 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
                 if ltc.current_stmt == "main()":
                     ltc.error(f"Main function body did not return a value, possibly because it was not defined correctly, instead got '{tokens[i].val}'") # more helpful error message for this common mistake
                 else:
-                    ltc.error(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'")
+                    ltc.error(f"Sub-expression did not reduce to a single value, instead got '{tokens[i].val}'", print_tokens=True, tokens=tokens) # debug
             tokens[i] = tokens[i].val[0]
 
         if isinstance(tokens[i], n.at_func_return):

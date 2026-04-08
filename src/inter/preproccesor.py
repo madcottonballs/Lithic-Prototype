@@ -38,6 +38,9 @@ def process_imports(source_text: str, ltc) -> str:
                     func_name = module_line.strip()[len("define "):].split("(")[0].strip()
                     module_line = module_line.replace(f"define {func_name}", f"define {module_alias}.{func_name}")
                 processed_lines.append(module_line)
+            
+            # stores aliases for usage with dot operators
+            ltc.aliases.append(module_alias)
         else:
             processed_lines.append(line)
 

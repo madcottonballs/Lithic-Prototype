@@ -27,8 +27,8 @@ class State:
         self.current_source = ""
         self.LITHIC_ROOT = os.path.dirname(os.path.abspath(__file__))
         self.STDLIB_PATH = "stdlib" # os.path.join(self.LITHIC_ROOT, "stdlib")   #  os.path.join will be used in final version, but for now we can just use a relative path since the working directory is always the project root 
-
-        self.function_names = [
+        self.aliases: list[str] = list()
+        self.function_names = (
             "printf",
             "let",
             "input",
@@ -72,7 +72,7 @@ class State:
             "open",
             "close",
             "flush",
-        ]
+        )
         self.types = {
             "string": t.string,
             "i32": t.i32,
@@ -90,38 +90,15 @@ class State:
             "tuple": t.ltctuple,
             "file": t.file,
         }
-        self.reserved_keywords = set(
-            [
-                # control flow
+        self.control_flow = (
                 "define",
                 "if",
                 "else",
                 "while",
                 "for",
                 "iterate",
-                # literals
-                "true",
-                "false",
-                # types
-                "string",
-                "i32",
-                "boolean",
-                "array",
-                "char",
-                "i64",
-                "i8",
-                "i16",
-                "u32",
-                "u64",
-                "u8",
-                "u16",
-                "ptr",
-                "tuple",
-                "file",
-                # operators-as-keywords
-                "not",
-            ]
-        )
+                "enumerate"
+            )
         self.primitives = ( # all supported array element types
             "char",
             "i32",
@@ -135,13 +112,31 @@ class State:
             "u16",
             "ptr",
         )
-    def error(self, message):
+
+        self.reserved_keywords = set(
+            [
+                # literals
+                "true",
+                "false",
+                # operators-as-keywords
+                "not"
+                # the rest are added after
+            ]
+        )
+        self.reserved_keywords.add(v for v in self.types.keys())
+        self.reserved_keywords.add(self.control_flow)
+        self.reserved_keywords.add(self.function_names)
+    def error(self, message, print_tokens=False, tokens=[]):
         """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet*"""
         print("Lithic Traceback (most recent call last):")
         for i, v in enumerate(self.traceback):
             print(f"In {v}( ... )")
         print(f"Line: '{self.current_stmt}'")
         #print(f"Lithic Error: {message}")
+        if print_tokens:
+            print("-----TOKENS:-------")
+            for v in tokens:
+                print(f"\t{type(v).__name__}:\t{v.val}")
         raise RuntimeError(message) # * temporary during development; will implement more sophisticated error handling later
         #exit(1)
 

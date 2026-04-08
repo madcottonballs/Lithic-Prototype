@@ -55,6 +55,8 @@ class subexp():
     # Parenthesized sub-expression node, containing a nested token list/tree.
     def __init__(self, val: list):
         self.val = val
+class dot_oper(oper): # used for accessing an attribute
+    pass
 
 class at_func_return:
     """Exists so @(ptr, type, idx) function can return a obj to be fed specifically to assign_oper. self.val holds a ltc_type read from memory."""
@@ -64,8 +66,10 @@ class at_func_return:
         self.type_size = type_size
         self.index = index
 
+
 # mother function
 def generate_trees(tokens, ltc, start_index=0):
+    """Build nodes"""
     # Non-list inputs are already single nodes and do not need list-based passes.
     if not isinstance(tokens, list):
         return
@@ -101,10 +105,7 @@ def _build_indexing(start_index, tokens, ltc):
         type_of_current_token = type(current_token).__name__
         type_of_next_token = type(next_token).__name__
         match type_of_current_token:
-            case "var_ref":
-                if type_of_next_token == "array" and next_token.get_size() == 1:
-                    _build_index_node(current_token, next_token, tokens, index, ltc)
-            case "ptr":
+            case "var_ref" | "ptr" | "array" | "string" | "ltctuple":
                 if type_of_next_token == "array" and next_token.get_size() == 1:
                     _build_index_node(current_token, next_token, tokens, index, ltc)
             case "memloc":
@@ -112,15 +113,6 @@ def _build_indexing(start_index, tokens, ltc):
                     index_token = next_token.val[0]
                     current_token.node = index_oper(current_token.node, index_token)
                     tokens[index:index + 2] = [current_token]
-            case "array":
-                if type_of_next_token == "array" and next_token.get_size() == 1:
-                    _build_index_node(current_token, next_token, tokens, index, ltc)
-            case "string":
-                if type_of_next_token == "array" and next_token.get_size() == 1:
-                    _build_index_node(current_token, next_token, tokens, index, ltc)
-            case "ltctuple":
-                if type_of_next_token == "array" and next_token.get_size() == 1:
-                    _build_index_node(current_token, next_token, tokens, index, ltc)
         index += 1
 
 def _build_index_node(current_token, next_token, tokens, index, ltc):
@@ -535,6 +527,8 @@ def _build_opers(tokens, start_idx, ltc):
                 build_free_oper(tokens, index, ltc)
             case "&":
                 build_memloc_oper(tokens, index, ltc)
+            case ".":
+                build_dot_oper(tokens, index, ltc)
         index += 1
 
 def _check_oper_syntax_errors(ltc, oper: str, tokens, index):

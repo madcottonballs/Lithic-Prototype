@@ -1,5 +1,8 @@
 import "strarraylib.ltc" as "strarr";
 define main() {
+    let ptr[10] test;
+    strarr.load("hello", 0, &test);
+
     let file f = open("test.txt", "r");
 
     while (not atEOF(f)) {
