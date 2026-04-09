@@ -119,13 +119,12 @@ class State:
                 "true",
                 "false",
                 # operators-as-keywords
-                "not"
-                # the rest are added after
+                "not",
             ]
         )
-        self.reserved_keywords.add(v for v in self.types.keys())
-        self.reserved_keywords.add(self.control_flow)
-        self.reserved_keywords.add(self.function_names)
+        self.reserved_keywords.update(self.types.keys())
+        self.reserved_keywords.update(self.control_flow)
+        self.reserved_keywords.update(self.function_names)
     def error(self, message, print_tokens=False, tokens=[]):
         """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet*"""
         print("Lithic Traceback (most recent call last):")

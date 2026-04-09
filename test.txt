@@ -1,6 +1,2 @@
-hello
-world
-butt
-
-current debug:
-    node oper is being built AFTER the function call, causing the function resolver to see load() instead of strarr.load()
+1
+2

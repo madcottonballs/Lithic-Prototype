@@ -12,9 +12,30 @@ def build_subexp(start_idx, tokens, ltc):
             helper.find_closing_parenthesis(index, tokens, n.subexp, ltc)
             # `tokens[index]` is now the new `subexp` at this position.
             n.generate_trees(tokens[index].val, ltc, 0)  # recursively generate trees for the contents of the parentheses
-            
+
+            # Handle function calls, including dotted library calls like alias.func(...)
             previous_symbol = tokens[index - 1].val
-            if isinstance(previous_symbol, str) and previous_symbol in ltc.function_names and not isinstance(tokens[index - 1], t.function):
+            dotted_callee = None
+            if index >= 3 and getattr(tokens[index - 2], "val", None) == ".":
+                lhs = tokens[index - 3]
+                rhs = tokens[index - 1]
+                if isinstance(lhs, t.token) and isinstance(rhs, t.token) and lhs.val in ltc.aliases:
+                    dotted_callee = f"{lhs.val}.{rhs.val}"
+
+            # Dotted user function call: alias.func(...)
+            if dotted_callee and dotted_callee in ltc.user_functions:
+                arguments = tokens[index].val
+                if arguments:
+                    if not any(getattr(tok, "val", None) == "," for tok in arguments):
+                        # Single expression argument; don't wrap if it's already a subexp.
+                        if len(arguments) == 1 and isinstance(arguments[0], n.subexp):
+                            arguments = [arguments[0]]
+                        else:
+                            arguments = [n.subexp(arguments)]
+                tokens[index - 3] = t.user_function(dotted_callee, arguments, ltc)
+                del tokens[index - 2:index + 1]
+                index -= 1
+            elif isinstance(previous_symbol, str) and previous_symbol in ltc.function_names and not isinstance(tokens[index - 1], t.function):
                 # This is a function call with parentheses already collapsed into a `subexp`.
                 # Convert it into a function node and keep only that node.
                 arguments = tokens[index].val
@@ -42,8 +63,6 @@ def build_subexp(start_idx, tokens, ltc):
                 tokens[index - 1] = t.user_function(tokens[index - 1].val, arguments, ltc)
                 del tokens[index]
                 index -= 1
-            else:
-                print(previous_symbol)
         index += 1
 
 def build_assign_oper(tokens, index, ltc):

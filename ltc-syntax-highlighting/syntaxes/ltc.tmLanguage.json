@@ -14,6 +14,9 @@
 			"include": "#variables"
 		},
 		{
+			"include": "#structs"
+		},
+		{
 			"include": "#keywords"
 		},
 		{
@@ -40,8 +43,8 @@
 			},
 			{
 				"name": "storage.type.function",
-				"match": "\\b(define|false|true|not)\\b",
-				"comment":"Blue keywords are used for function definitions and boolean literals "
+				"match": "\\b(define|false|true|not|struct)\\b",
+				"comment":"Blue keywords are used for definitions and boolean literals "
 			}]
 		},
 		"comments": {
@@ -81,7 +84,7 @@
 			"patterns": [
 				{
 					"name": "storage.modifier.declaration",
-					"match": "\\b(let)\\b"
+					"match": "\\b(let|struct)\\b"
 				},
 				{
 					"name": "support.function.builtin",
@@ -102,6 +105,19 @@
 				}
 			]
 		},
+		"structs": {
+			"patterns": [
+				{
+					"comment": "Matches: struct <name> { ... }",
+					"match": "\\b(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+					"captures": {
+						"1": { "name": "storage.modifier.declaration" },
+						"2": { "name": "entity.name.type" }
+					}
+				}
+			]
+		},
+
 		"identifiers": {
 			"patterns": [
 				{
@@ -111,8 +127,7 @@
 				}
 			]
 		},
-
-	"strings": {
+		"strings": {
 		"patterns": [
 			{
 				"name": "string.quoted.double",
@@ -138,8 +153,8 @@
 			}
 
 		]
-	},
-	"functions": {
+		},
+		"functions": {
 		"patterns": [
 			{
 			"comment": "Matches: define <name>(...)",

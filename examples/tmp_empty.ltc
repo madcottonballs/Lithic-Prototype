@@ -1,4 +1,9 @@
 import "strarraylib.ltc" as "strarr";
+struct file {
+    let int pos;
+    let int size;
+    let ptr data;
+}
 define main() {
     let ptr[10] test;
     strarr.load("hello", 0, &test);
