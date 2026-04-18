@@ -3,6 +3,63 @@ This includes both evaluating the operands and performing the operation itself.
 The main entry point is the resolve_opers function, which takes a list of tokens and an index, and checks if the token at that index is an operator that can be resolved. 
 If it is, it resolves the operator and returns True along with the (possibly updated) stack pointer. If it is not, it returns False along with the original stack pointer."""
 
+def _resolve_dot_target(dot_node, ltc, return_values, evaluate, execute_source_fn):
+    """Return (struct_name, field_name, struct_addr) for nested dot assignment."""
+    t = ltc.t
+    n = ltc.n
+    helper = ltc.helper
+    shelper = ltc.shelper
+
+    if not isinstance(dot_node, n.dot_oper):
+        ltc.error("dot target resolver expects a dot operator node")
+
+    # Left-associated chain: dot(dot(b, ex), x)
+    if isinstance(dot_node.node1, n.dot_oper):
+        parent_name, parent_field, parent_addr = _resolve_dot_target(
+            dot_node.node1, ltc, return_values, evaluate, execute_source_fn
+        )
+        parent_value = shelper.read_struct_field_from_memory(ltc, parent_name, parent_field, parent_addr)
+        if not isinstance(parent_value, t.struct_instance):
+            ltc.error("Nested dot assignment requires intermediate fields to be structs")
+        if not parent_value.inmemory or parent_value.memloc is None:
+            ltc.error("Nested struct field must be stored in memory for assignment")
+        if not isinstance(dot_node.node2, t.token):
+            ltc.error("Final field in dot assignment must be an identifier token")
+        return parent_value.struct_name, dot_node.node2.val, parent_value.memloc
+
+    # Right-associated chain fallback: dot(b, dot(ex, x))
+    if isinstance(dot_node.node2, n.dot_oper):
+        base_value = helper.resolve_node(dot_node.node1, ltc, return_values, evaluate, execute_source_fn)
+        if not isinstance(base_value, t.struct_instance):
+            ltc.error("dot assignment expects a struct instance on the left-hand side")
+        if not base_value.inmemory or base_value.memloc is None:
+            ltc.error("Struct instance must be stored in memory to assign fields with '.'")
+
+        inner = dot_node.node2
+        intermediate = shelper.read_struct_field_from_memory(ltc, base_value.struct_name, inner.node1.val, base_value.memloc)
+        if not isinstance(intermediate, t.struct_instance):
+            ltc.error("Nested dot assignment requires intermediate fields to be structs")
+        if not intermediate.inmemory or intermediate.memloc is None:
+            ltc.error("Nested struct field must be stored in memory for assignment")
+        if isinstance(inner.node2, n.dot_oper):
+            return _resolve_dot_target(
+                n.dot_oper(intermediate, inner.node2),
+                ltc,
+                return_values,
+                evaluate,
+                execute_source_fn,
+            )
+        return intermediate.struct_name, inner.node2.val, intermediate.memloc
+
+    struct_obj = helper.resolve_node(dot_node.node1, ltc, return_values, evaluate, execute_source_fn)
+    if not isinstance(struct_obj, t.struct_instance):
+        ltc.error("dot assignment expects a struct instance on the left-hand side")
+    if not struct_obj.inmemory or struct_obj.memloc is None:
+        ltc.error("Struct instance must be stored in memory to assign fields with '.'")
+    if not isinstance(dot_node.node2, t.token):
+        ltc.error("dot assignment target must end in a field name")
+    return struct_obj.struct_name, dot_node.node2.val, struct_obj.memloc
+
 def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
     t = ltc.t
     n = ltc.n
@@ -17,6 +74,9 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             resolve_memloc_oper(tokens, i, ltc)
             return True
     elif isinstance(tokens[i], n.oper):
+        if isinstance(tokens[i], n.dot_oper):
+            resolve_dot_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
+            return True
         if isinstance(tokens[i], n.index_oper):
             resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True
@@ -42,12 +102,6 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             resolve_bool_oper(ltc, tokens, i, "<=", return_values, evaluate, execute_source_fn)
             return True
 
-    # Resolve arithmetic operands that may still be var_refs or index nodes.
-    if isinstance(tokens[i], (n.add, n.sub, n.mult, n.div)):
-        if not isinstance(tokens[i].node1, t.integer):
-            tokens[i].node1 = ltc.helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
-        if not isinstance(tokens[i].node2, t.integer):
-            tokens[i].node2 = ltc.helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
     if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.integer):
         if type(tokens[i].node1) == t.ptr or type(tokens[i].node2) == t.ptr: # 
@@ -55,7 +109,7 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         else:
             ptr_arithmatic = False
         if (type(tokens[i].node1) != type(tokens[i].node2)) and not ptr_arithmatic:  # if not using ptr arithmetic, then the types must match. If using ptr arithmetic, then one can be a ptr and the other can be an integer.
-            # Allow ++/-- and // /** rewriting to use i32 literals with other integer types by aligning the literal.
+            # Allow ++/-- and // ** rewriting to use i32 literals with other integer types by aligning the literal.
             if isinstance(tokens[i], (n.add, n.sub)):
                 if isinstance(tokens[i].node1, t.integer) and isinstance(tokens[i].node2, t.i32) and tokens[i].node2.val in (0, 1, 2):
                     tokens[i].node2 = type(tokens[i].node1)(tokens[i].node2.val, ltc)
@@ -90,34 +144,8 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
         elif isinstance(tokens[i], n.div):
             tokens[i] = resolve_type(tokens[i].node1.val / tokens[i].node2.val, ltc)
     else:
-        if isinstance(tokens[i].node1, n.subexp):
-            evaluate(tokens[i].node1.val, ltc, return_values, execute_source_fn)
-            if len(tokens[i].node1.val) != 1:
-                ltc.error("Sub-expression did not reduce to a single value")
-            tokens[i].node1 = tokens[i].node1.val[0]
-        elif isinstance(tokens[i].node1, n.oper):
-            temp = [tokens[i].node1]
-            evaluate(temp, ltc, return_values, execute_source_fn)
-            tokens[i].node1 = temp[0]
-        elif isinstance(tokens[i].node1, t.function):
-            temp = [tokens[i].node1]
-            evaluate(temp, ltc, return_values, execute_source_fn)
-            tokens[i].node1 = temp[0]
-
-        if isinstance(tokens[i].node2, n.subexp):
-            evaluate(tokens[i].node2.val, ltc, return_values, execute_source_fn)
-            if len(tokens[i].node2.val) != 1:
-                ltc.error("Sub-expression did not reduce to a single value")
-            tokens[i].node2 = tokens[i].node2.val[0]
-        elif isinstance(tokens[i].node2, n.oper):
-            temp = [tokens[i].node2]
-            evaluate(temp, ltc, return_values, execute_source_fn)
-            tokens[i].node2 = temp[0]
-        elif isinstance(tokens[i].node2, t.function):
-            temp = [tokens[i].node2]
-            evaluate(temp, ltc, return_values, execute_source_fn)
-            tokens[i].node2 = temp[0]
-
+        tokens[i].node1 = ltc.helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
+        tokens[i].node2 = ltc.helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
         return True
 
     return False
@@ -146,10 +174,15 @@ def resolve_index_oper(tokens, i, ltc, return_values, evaluate, execute_source_f
         elem = base.val[index_val]
         val = elem.val if hasattr(elem, "val") else elem
         
-        if base.arrayType in ltc.primitives:
-            tokens[i] = ltc.types[base.arrayType](val, ltc)
-        else:
-            ltc.error("Unsupported type of array used for indexing")
+        match base.arrayType:
+            case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
+                tokens[i] = ltc.types[base.arrayType](val, ltc)
+            case "boolean":
+                tokens[i] = t.boolean(val)
+            case "char":
+                tokens[i] = t.char(val)
+            case _:
+                ltc.error("Unsupported type of array used for indexing")
         
         return
 
@@ -211,8 +244,25 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
     t = ltc.t
     n = ltc.n
     helper = ltc.helper
+    shelper = ltc.shelper
     namespace = ltc.namespace
+    if isinstance(tokens[i].node1, n.dot_oper):
+        rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
+        struct_name, field_name, struct_addr = _resolve_dot_target(
+            tokens[i].node1, ltc, return_values, evaluate, execute_source_fn
+        )
 
+        shelper.update_struct_field_in_memory(
+            ltc,
+            struct_name,
+            field_name,
+            rhs,
+            struct_addr,
+        )
+
+        tokens[i] = t.i32(0, ltc)
+        return
+    
     if isinstance(tokens[i].node1, t.function) and tokens[i].node1.val == "@":
         temp = [tokens[i].node1]
         evaluate(temp, ltc, return_values, execute_source_fn)   # return_values can be ignored
@@ -289,6 +339,35 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
                 helper.load_to_mem(ltc, rhs, pointer_type, memidx=target_addr)
                 tokens[i] = t.i32(0, ltc)
                 return
+
+        resolved_base = helper.resolve_node(base, ltc, return_values, evaluate, execute_source_fn)
+        if isinstance(resolved_base, t.array):
+            array_len = resolved_base.get_size()
+            elem_type = resolved_base.arrayType
+            if index_val.val < 0:
+                index_val.val = index_val.val % array_len
+            if index_val.val >= array_len:
+                ltc.error(f"Array index out of range: {index_val.val} for length {array_len}")
+            if type(rhs).__name__ != elem_type:
+                ltc.error(f"aSet type mismatch: expected {elem_type}, got {type(rhs).__name__}")
+            if not resolved_base.inmemory or resolved_base.memloc is None:
+                ltc.error("Indexed assignment requires an array stored in memory")
+
+            base_addr = resolved_base.memloc
+            match elem_type:
+                case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16" | "ptr":
+                    elem_addr = base_addr + (index_val.val * helper.get_ltc_type_size(elem_type, ltc))
+                    helper.load_to_mem(ltc, rhs, elem_type, memidx=elem_addr)
+                case "boolean":
+                    elem_addr = base_addr + index_val.val
+                    helper.load_to_mem(ltc, rhs, "boolean", memidx=elem_addr)
+                case "char":
+                    elem_addr = base_addr + index_val.val
+                    helper.load_to_mem(ltc, rhs, "char", memidx=elem_addr)
+                case _:
+                    ltc.error(f"aSet does not support element type '{elem_type}' yet")
+            tokens[i] = t.i32(0, ltc)
+            return
 
         ltc.error("Indexed assignment requires a variable reference base")
 
@@ -466,5 +545,22 @@ def resolve_memloc_oper(tokens, i, ltc):
 
     tokens[i] = t.ptr(rhs.memloc, ltc)
 
+def resolve_dot_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn=None):
+    shelper = ltc.shelper
+    helper = ltc.helper
+    t = ltc.t
 
+    struct_obj = helper.resolve_node(tokens[i].node1, ltc, return_values, evaluate, execute_source_fn)
+    field_name = tokens[i].node2.val
 
+    if not isinstance(struct_obj, t.struct_instance):
+        ltc.error("dot operator expects a struct instance on the left-hand side")
+    if not struct_obj.inmemory or struct_obj.memloc is None:
+        ltc.error("Struct instance must be stored in memory to access fields with '.'")
+
+    tokens[i] = shelper.read_struct_field_from_memory(
+        ltc,
+        struct_obj.struct_name,
+        field_name,
+        struct_obj.memloc,
+    )

@@ -1,0 +1,7 @@
+struct Bad {
+    let i32 not;
+}
+
+define main() {
+    return(0);
+}

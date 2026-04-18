@@ -1,8 +1,7 @@
 import "strarraylib.ltc" as "strarr";
-struct file {
-    let int pos;
-    let int size;
-    let ptr data;
+struct pos {
+    let i32 x;
+    let i32 y;
 }
 define main() {
     let ptr[10] test;

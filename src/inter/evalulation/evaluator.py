@@ -201,5 +201,7 @@ def function_processing(tokens, i, ltc, return_values, evaluate, execute_source_
             fileio.resolve_readbytes(tokens, i, ltc)
         case "atEOF":
             fileio.resolve_atEOF(tokens, i, ltc)
+        case "new":
+            data.resolve_new(tokens, i, ltc)
 
     return return_values

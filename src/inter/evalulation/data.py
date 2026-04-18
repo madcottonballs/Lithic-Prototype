@@ -4,6 +4,7 @@ def _type_ref(ltc, token, typeref: str) -> bool:
 def resolve_let(tokens, i, ltc) -> None:
     t = ltc.t
     helper = ltc.helper
+    shelper = ltc.structshelper
     if len(tokens[i].args) not in (2, 4):
         ltc.error("let expects: let [type] [varname] OR let [type] [varname] = [value]")
 
@@ -26,6 +27,19 @@ def resolve_let(tokens, i, ltc) -> None:
         if not (isinstance(equals_arg, t.token) and equals_arg.val == "="):
             ltc.error("let expects '=' as the third argument")
 
+        if isinstance(var_type_arg, t.token) and var_type_arg.val in ltc.structs:
+            if not isinstance(var_value_arg, t.struct_instance) or var_value_arg.struct_name != var_type_arg.val:
+                ltc.error("Struct initializer must be new(structType) or a struct instance of the same type")
+            shelper.write_struct_to_memory(ltc, var_type_arg.val, var_value_arg, memidx=var_mem_addr)
+            var_size = shelper.get_struct_size(ltc, var_type_arg.val)
+            ltc.sp += var_size
+            ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
+                "type": var_type_arg.val,
+                "addr": var_mem_addr,
+                "size": var_size,
+            }
+            tokens[i] = t.i32(0, ltc)
+            return
         if type(var_value_arg) != ltc.types[var_type_arg.val]:
             ltc.error(
                 f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"
@@ -55,6 +69,18 @@ def resolve_let(tokens, i, ltc) -> None:
         else:
             helper.load_to_mem(ltc, var_value_arg, var_type_arg.val)
     else:  # let without initializer, example: let i32 x;
+        if isinstance(var_type_arg, t.token) and var_type_arg.val in ltc.structs:
+            struct_inst = helper.create_struct_instance(ltc, var_type_arg.val)
+            helper.write_struct_to_memory(ltc, var_type_arg.val, struct_inst, memidx=var_mem_addr)
+            var_size = helper.get_struct_size(ltc, var_type_arg.val)
+            ltc.sp += var_size
+            ltc.namespace[len(ltc.namespace) - 1][var_name_arg.val] = {
+                "type": var_type_arg.val,
+                "addr": var_mem_addr,
+                "size": var_size,
+            }
+            tokens[i] = t.i32(0, ltc)
+            return
         if isinstance(var_type_arg, t.array): # for uninitialized arrays, we still need to parse the type to get the arrayType and size info
             empty_array = t.array([], ltc, arrayType=var_type_arg.arrayType, parse=False)
             empty_array.size = var_type_arg.size
@@ -607,3 +633,21 @@ def resolve_split(tokens, i, ltc) -> None:
         split_strings = string_arg.val.split(delimiter_arg.val) 
 
     tokens[i] = ltc.helper.create_string_array(ltc, split_strings)
+
+def resolve_new(tokens, i, ltc) -> None:
+    t = ltc.t
+    if len(tokens[i].args) != 1:
+        ltc.error("new expects exactly one argument")
+    arg = tokens[i].args[0]
+    if not isinstance(arg, t.token):
+        ltc.error(f"Argument to new must be a type token, got {type(arg).__name__}")
+
+    type_name = arg.val
+    if type_name in ltc.structs:
+        tokens[i] = ltc.structshelper.create_struct_instance(ltc, type_name)
+        return
+    if type_name in ltc.types:
+        tokens[i] = ltc.helper.recieve_empty_form(ltc, type_name)
+        return
+
+    ltc.error(f"Argument to new must be a valid type or struct, got '{type_name}'")

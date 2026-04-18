@@ -1,0 +1,15 @@
+struct Inner {
+    let i32 x = 7;
+}
+
+struct Outer {
+    let Inner ex;
+}
+
+define main() {
+    let Outer b = new(Outer);
+    printf(b.ex.x);
+    b.ex.x = 20;
+    printf(b.ex.x);
+    return(0);
+}

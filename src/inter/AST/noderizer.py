@@ -529,6 +529,17 @@ def _build_opers(tokens, start_idx, ltc):
                 build_memloc_oper(tokens, index, ltc)
             case ".":
                 build_dot_oper(tokens, index, ltc)
+                collapsed_index = max(index - 1, 0)
+                if (
+                    collapsed_index + 1 < len(tokens)
+                    and isinstance(tokens[collapsed_index], dot_oper | index_oper)
+                    and type(tokens[collapsed_index + 1]).__name__ == "array"
+                    and tokens[collapsed_index + 1].get_size() == 1
+                ):
+                    _build_index_node(tokens[collapsed_index], tokens[collapsed_index + 1], tokens, collapsed_index, ltc)
+                # Re-scan from the replacement point so chained dots and a following
+                # assignment like `b.x = 20` both get collapsed in the same pass.
+                index -= 1
         index += 1
 
 def _check_oper_syntax_errors(ltc, oper: str, tokens, index):

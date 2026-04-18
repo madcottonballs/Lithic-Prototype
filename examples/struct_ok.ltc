@@ -1,0 +1,21 @@
+
+struct Bar {
+    let char[50] example;
+    
+}
+
+define main() {
+    let Bar b = new(Bar);
+    let string buffer = input();
+    if (length(buffer) > 50) {
+        exit(1);
+    }
+    iterate(i, length(buffer)) {
+        b.example[i] = buffer[i];
+    }
+    iterate(i, length(buffer)) {
+        printf(b.example[i])
+    }
+    return(0);
+}
+

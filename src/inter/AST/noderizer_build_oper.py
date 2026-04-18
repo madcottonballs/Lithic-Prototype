@@ -276,9 +276,10 @@ def build_dot_oper(tokens, index, ltc):
     lhs = tokens[index-1]
     rhs = tokens[index+1]
 
-    if lhs.val in ltc.aliases: # means this is a library function call e.g.: strarr.load()
+    lhs_val = getattr(lhs, "val", None)
+    if lhs_val in ltc.aliases: # means this is a library function call e.g.: strarr.load()
 
-        lhs = ltc.t.token(lhs.val + "." + rhs.val)
+        lhs = ltc.t.token(lhs_val + "." + rhs.val)
         tokens[index - 1:index + 2] = [lhs]
 
     else: # this means its a struct.attr e.g.: player.x

@@ -1,4 +1,5 @@
-import helper
+import helpers.general as helper
+import helpers.structs as structshelper
 import evalulation.evaluator as evaluator
 import AST.noderizer as noderizer
 import token_generation.typerizer as t
@@ -15,6 +16,8 @@ class State:
         self.user_functions: dict[str, dict[str, object]] = {}
         self.t = t
         self.helper = helper
+        self.structshelper = structshelper
+        self.shelper = structshelper
         self.n = noderizer
         self.noderizer = noderizer # alias
         self.tokenizer = tokenizer
@@ -28,6 +31,7 @@ class State:
         self.LITHIC_ROOT = os.path.dirname(os.path.abspath(__file__))
         self.STDLIB_PATH = "stdlib" # os.path.join(self.LITHIC_ROOT, "stdlib")   #  os.path.join will be used in final version, but for now we can just use a relative path since the working directory is always the project root 
         self.aliases: list[str] = list()
+        self.structs: dict[str, dict[str, str]] = {} # maps struct names to dicts mapping field names to types
         self.function_names = (
             "printf",
             "let",
@@ -72,6 +76,7 @@ class State:
             "open",
             "close",
             "flush",
+            "new"
         )
         self.types = {
             "string": t.string,
@@ -97,7 +102,8 @@ class State:
                 "while",
                 "for",
                 "iterate",
-                "enumerate"
+                "enumerate",
+                "struct"
             )
         self.primitives = ( # all supported array element types
             "char",
@@ -225,6 +231,95 @@ def _parse_function_declaration(source_text: str, def_index: int, ltc: State) ->
 
     return function_name, arg_types, arg_names, function_body, block_close_index + 1
 
+def _collect_struct_fields(block_source: str, ltc: State, struct_name: str) -> dict:
+    """Collect struct fields from a restricted struct block (let-only)."""
+    fields: dict[str, object] = {}
+    order: list[str] = []
+    defaults: dict[str, object] = {}
+
+    cursor = 0
+    source_length = len(block_source)
+    while cursor < source_length:
+        cursor = helper.skip_whitespace(block_source, cursor)
+        if cursor >= source_length:
+            break
+
+        statement_text, cursor = helper.read_statement(block_source, cursor)
+        if statement_text:
+            ltc.current_stmt = statement_text.strip()
+            tokens = tokenizer.lexer(statement_text)
+            t.parser(tokens, ltc)
+            noderizer.generate_trees(tokens, ltc, 0)
+
+            if len(tokens) != 1 or not isinstance(tokens[0], t.function) or tokens[0].val != "let":
+                ltc.error("struct body may only contain let declarations")
+
+            let_node = tokens[0]
+            if len(let_node.args) not in (2, 4):
+                ltc.error("struct let expects: let [type] [varname] OR let [type] [varname] = [value]")
+
+            var_type_arg = let_node.args[0]
+            var_name_arg = let_node.args[1]
+
+            if not isinstance(var_name_arg, t.token):
+                ltc.error("struct field name must be a valid identifier")
+            if var_name_arg.val in ltc.reserved_keywords:
+                ltc.error(f"Struct field name '{var_name_arg.val}' is a reserved keyword")
+            if var_name_arg.val in fields:
+                ltc.error(f"Duplicate struct field name '{var_name_arg.val}'")
+
+            if isinstance(var_type_arg, t.array):
+                type_name = {
+                    "kind": "array",
+                    "elem_type": var_type_arg.arrayType,
+                    "length": var_type_arg.get_size(),
+                }
+            elif isinstance(var_type_arg, t.token):
+                type_name = var_type_arg.val
+            else:
+                ltc.error("struct field type must be a type token")
+
+            if isinstance(type_name, dict):
+                if type_name["elem_type"] not in ltc.types and type_name["elem_type"] not in ltc.structs:
+                    ltc.error(
+                        f"Unknown array element type '{type_name['elem_type']}' in struct field '{var_name_arg.val}'"
+                    )
+            elif type_name not in ltc.types and type_name not in ltc.structs:
+                if type_name == struct_name: # tried to use struct foo in decleration of struct foo
+                    ltc.error(f"In decleration of '{struct_name}', you tried to declare field '{var_name_arg.val}' to be type '{struct_name}' which has not yet been fully defined")
+                else: # general unknown type error
+                    ltc.error(f"Unknown type '{type_name}' in struct field '{var_name_arg.val}'")
+
+            fields[var_name_arg.val] = type_name
+            order.append(var_name_arg.val)
+
+            if len(let_node.args) == 4:
+                var_value_arg = let_node.args[3]
+                if not isinstance(var_value_arg, t.ltc_type):
+                    ltc.error("struct field initializer must be a literal value")
+                if isinstance(type_name, dict):
+                    if not isinstance(var_value_arg, t.array):
+                        ltc.error("Array struct field initializer must be an array literal or array value")
+                    var_value_arg.parse(ltc)
+                    if var_value_arg.arrayType != type_name["elem_type"]:
+                        ltc.error(
+                            f"Array struct field '{var_name_arg.val}' expects element type '{type_name['elem_type']}', got '{var_value_arg.arrayType}'"
+                        )
+                    if var_value_arg.get_size() != type_name["length"]:
+                        ltc.error(
+                            f"Array struct field '{var_name_arg.val}' expects length {type_name['length']}, got {var_value_arg.get_size()}"
+                        )
+                defaults[var_name_arg.val] = var_value_arg
+
+        if cursor < source_length and (block_source[cursor] == ";" or block_source[cursor] == "}" or block_source[cursor] == "\n"):
+            cursor += 1
+
+    return {
+        "fields": fields,
+        "order": order,
+        "defaults": defaults,
+    }
+
 def execute_source(source, ltc: State, return_values) -> list:
     """Execute source recursively with runtime control-flow and stack-frame push/pop.
     \n Returns return value(s) if executing a function body"""
@@ -248,6 +343,17 @@ def execute_source(source, ltc: State, return_values) -> list:
                 "arg_names": arg_names,
                 "body": function_body,
             }
+            cursor = next_cursor
+            continue
+
+        if helper.is_controlflow_keyword_at(source_text, cursor, "struct", get_paren=False):
+            struct_name, block_source, next_cursor = helper._parse_struct_declaration(source_text, cursor, ltc)
+            if struct_name in ltc.structs:
+                ltc.error(f"Struct '{struct_name}' is already defined")
+            field_meta = _collect_struct_fields(block_source, ltc, struct_name)
+            ltc.structs[struct_name] = field_meta
+            if struct_name not in ltc.types:
+                ltc.types[struct_name] = t.struct_instance
             cursor = next_cursor
             continue
 

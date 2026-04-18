@@ -17,9 +17,8 @@ def resolve_node(node, ltc, return_values, evaluate, execute_source_fn):
     if isinstance(node, t.var_ref):
         return dereference_var(ltc, node)
 
-    # If evaluate isn't available (some callers pass None), just return the node as-is.
     if evaluate is None:
-        return node
+        raise Exception("evaluate function is required to resolve non-var_ref nodes, check caller of resolve_node")
 
     # Evaluate any node type by running it through the evaluator.
     temp = [node]
@@ -160,6 +159,35 @@ def is_controlflow_keyword_at(source_text: str, cursor: int, keyword: str, get_p
 
     return left_ok and right_ok
 
+def _parse_struct_declaration(source_text: str, struct_index: int, ltc):
+    """Parse `struct Name { ... }` and return (name, block_source, next_cursor)."""
+    keyword = "struct"
+    name_start = skip_whitespace(source_text, struct_index + len(keyword))
+    if name_start >= len(source_text):
+        ltc.error("Expected struct name after struct")
+
+    name_end = name_start
+    while name_end < len(source_text) and (
+        source_text[name_end].isalnum() or source_text[name_end] == "_"
+    ):
+        name_end += 1
+
+    struct_name = source_text[name_start:name_end].strip()
+    if not struct_name:
+        ltc.error("Expected struct name after struct")
+    if struct_name in ltc.reserved_keywords:
+        ltc.error(f"Struct name '{struct_name}' is a reserved keyword")
+    if not (struct_name[0].isalpha() or struct_name[0] == "_"):
+        ltc.error("Struct name must start with a letter or underscore")
+
+    block_open_index = skip_whitespace(source_text, name_end)
+    if block_open_index >= len(source_text) or source_text[block_open_index] != "{":
+        ltc.error("Expected '{' after struct name")
+
+    block_close_index = find_matching(source_text, block_open_index, "{", "}", ltc)
+    block_source = source_text[block_open_index + 1:block_close_index]
+
+    return struct_name, block_source, block_close_index + 1
 def parse_control_block(source_text: str, keyword_index: int, keyword: str, ltc) -> tuple[str, str, int]:
     """Parse `<keyword> (<condition>) { <block> }` and return condition/body/next index.
 
@@ -422,10 +450,17 @@ def dereference_var(ltc, var_ref_token) -> object:
             file_obj.var_name = var_ref_token.val
             return file_obj
         case _:
+            if var_type in ltc.structs:
+                struct_obj = ltc.structshelper.read_struct_from_memory(ltc, var_type, addr)
+                struct_obj.inmemory = True
+                struct_obj.memloc = addr
+                return struct_obj
             ltc.error(f"Unsupported variable type: {var_type}")
 
-def get_ltc_type_size(type_name: str, ltc) -> int:
+def get_ltc_type_size(type_name: str, ltc, array_obj=None) -> int:
     """Helper function to get the byte size of any LTC type."""
+    if type_name in ltc.structs:
+        return ltc.structshelper.get_struct_size(ltc, type_name)
     match type_name:
         case "i8"|"u8"|"char"|"boolean":
             return 1
@@ -435,7 +470,9 @@ def get_ltc_type_size(type_name: str, ltc) -> int:
             return 4
         case "i64"|"u64"|"ptr":
             return 8
-        case "string" | "array" | "tuple" | "ltctuple":
+        case "array": # if youre looking for the size of an array, you must pass in the array obj so size and arrayType can be known
+            return array_obj.get_size()
+        case "string" | "tuple" | "ltctuple":
             ltc.error(f"Dynamically sized types like '{type_name}' do not have a fixed byte size")
         case _:
             ltc.error(f"Unknown LTC type: {type_name}")
@@ -462,6 +499,18 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
         resolved_type = type(object).__name__
     else:
         resolved_type = input_type
+
+    if resolved_type in ltc.structs:
+        if not isinstance(object, ltc.t.struct_instance):
+            ltc.error("Struct memory write requires a struct instance")
+        ltc.structshelper.write_struct_to_memory(
+            ltc,
+            object.struct_name,
+            object,
+            memidx=None if memidx is None else write_ptr,
+        )
+        ltc.helper.memory_bounds_check(ltc)
+        return
 
     match resolved_type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
@@ -521,12 +570,15 @@ def load_to_mem(ltc, object, input_type="no type entered", memidx: int | None = 
     memory_bounds_check(ltc)
     return
 
+
 def memory_bounds_check(ltc) -> None:
     if ltc.hp <= ltc.sp:
         ltc.error("Stack and Heap intersect. Out of memory.")
 
 def recieve_empty_form(ltc, type):
     """give the name of the type you want, this function returns an empty instance of that type"""
+    if type in ltc.structs:
+        return ltc.structshelper.create_struct_instance(ltc, type)
     match type:
         case "i32" | "i64" | "i8" | "i16" | "u32" | "u64" | "u8" | "u16":
             return ltc.types[type](0, ltc)
@@ -542,6 +594,7 @@ def recieve_empty_form(ltc, type):
             return ltc.t.char('')
         case "tuple":
             return ltc.t.ltctuple(ltc, ())
+
 
 def locate_var_in_namespace(namespace, var_name, return_just_the_check=True):
     """Search for a variable in the namespace stack and return its metadata and scope level.

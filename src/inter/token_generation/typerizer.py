@@ -18,6 +18,11 @@ class file(ltc_type):
         self.contents = None # contents is a str.
         self.cursor = 0 # cursor tracks where we are in the file for read/write operations. For read operations, this will determine what part of the contents string is returned. For write operations, this will determine where new data is written in the file (for simplicity, we will treat the file contents as a single string and just insert new data at the cursor position).
 
+class struct_instance(ltc_type):
+    def __init__(self, val, ltc, struct_name: str | None = None):
+        super().__init__(val)
+        self.struct_name = struct_name or val
+
 class string(ltc_type):
     def __init__(self, val):
         super().__init__(val)
