@@ -1,14 +1,27 @@
 /* 
     vectlib.ltc is a stdlib for heterogenous resizable vectors
     vectors are implemented using the vec struct, which has the fields
-        u8 size
-        u8 allocated
+        u32 size
+        u32 allocated
         ptr _data
+        ptr _types
     size defaults to 0 and allocated defaults to 1
+    constants:
+        0 - i8
+        1 - i16
+        2 - i32
+        3 - i64
+        4 - u8
+        5 - u16
+        6 - u32
+        7 - u64
+        8 - boolean
+        9 - char
     functions:
-        append(vec vector, ptr obj)
+        append(vec vector, ptr obj, i32 type)
             appends the object to the end of the vector
             if size has reached or exceeded allocated, contents of the vector are copied to a new location and allocated is doubled
+            type is a number between 0-9 that refers to the type of the new element, for info look at constants
             returns 0 for no errors
         get(vec vector, i32 idx, string type)
             returns the object located at an index in the vector
@@ -16,9 +29,10 @@
             you must keep track of the types of the elements yourself
             exit(1) if idx is greater than or equal to size, otherwise return the object
             supported types currently are i64, i32, i16, i8, u8, u16, u32, u64, boolean, and char
-        set(vec vector, i32 idx, ptr new_obj)
+        set(vec vector, i32 idx, ptr new_obj, i32 type)
             sets an element to be a new obj
             new_obj paramter must be a reference to the obj, not the obj itself
+            type is a number between 0-9 that refers to the type of the new element, for info look at constants
             if idx is greater than or equal to size, element is not changed and return(1) otherwise return(0)
         shrink(vec vector)
             copies the contents of the vector to a new location, then reduces allocated to size
@@ -26,77 +40,88 @@
         delete(vec vector, i32 idx)
             removes the element at the specified index
             does so by shifting left all elements until the final element is a null ptr
-            returns the deleted ptr, or null ptr if idx is not valid
+            returns the deleted ptr, or 0 if idx is not valid
 */
 
 struct vec {
-    let u8 size = 0;
-    let u8 allocated = 1;
+    let u32 size = 0;
+    let u32 allocated = 1;
     let ptr _data;
+    let ptr _types;
 }
 
-define append(vec vector, ptr obj) {
-    if ((vector.size + 1) >= vector.allocated) {
+define append(vec vector, ptr obj, i32 type) {
+    if ((vector.size + 1) >= vector.allocated) { /* determines if a resize is necessary */
         vector.allocated**;
-        let ptr new_data = mallocType(ptr, vector.allocated);
 
-        _copy(vector, new_data)
+        let ptr new_data = mallocType(ptr, vector.allocated);
+        let ptr new_types = mallocType(u8, vector.allocated);
+
+        _copy_data(vector, new_data)
+        _copy_types(vector, new_types)
 
         vector._data = new_data;
+        vector._types = new_types
     }
-    @(vector._data, ptr, vector.size) = obj;
+
+    @(vector._data, ptr, vector.size) = obj; /* the actual write */
+    @(vector._types, u8, vector.size) = type -> u8; /* the actual write */
+
     vector.size++;
     return(0);
 }
 
-define get(vec vector, i32 idx, string type) {
+define get(vec vector, i32 idx) {
     if (idx >= vector.size) {
         exit(1);
     }
     
     let ptr element = @(vector._data, ptr, idx)
+    let u8 type = @(vector._types, u8, idx)
 
-    if (type == "i32") {
+    if (type == 2) {
         return( @(element, i32, 0) );
     }
-    if (type == "i64") {
+    if (type == 3) {
         return( @(element, i64, 0) );
     }
-    if (type == "i16") {
+    if (type == 1) {
         return( @(element, i16, 0) );
     }
-    if (type == "i8") {
+    if (type == 0) {
         return( @(element, i8, 0) );
     }
-    if (type == "u64") {
+    if (type == 7) {
         return( @(element, u64, 0) );
     }
-    if (type == "u32") {
+    if (type == 6) {
         return( @(element, u32, 0) );
     }
-    if (type == "u16") {
+    if (type == 5) {
         return( @(element, u16, 0) );
     }
-    if (type == "u8") {
+    if (type == 4) {
         return( @(element, u8, 0) );
     }
-    if (type == "char") {
+    if (type == 9) {
         return( @(element, char, 0) );
     }
-    if (type == "boolean") {
+    if (type == 8) {
         return( @(element, boolean, 0) );
     }
 }
 
-define set(vec vector, i32 idx, ptr new_obj) {
+define set(vec vector, i32 idx, ptr new_obj, i32 type) {
     if (idx >= vector.size) {
         return(1);
     }
     @(vector._data, ptr, idx) = new_obj;
+
+    @(vector._types, u8, idx) = type -> u8;    
     return(0);
 }
 
-define _copy(vec vector, ptr new_data) {
+define _copy_data(vec vector, ptr new_data) {
     /* 
         this func copies the contents of the vector _data to a new location 
         the new_data ptr must have enough room for the entire vector size or undefined behavior will occur
@@ -107,10 +132,28 @@ define _copy(vec vector, ptr new_data) {
     return(0);
 }
 
+define _copy_types(vec vector, ptr new_types) {
+    /* 
+        this func copies the contents of the vector _types to a new location 
+        the new_types ptr must have enough room for the entire vector size or undefined behavior will occur
+    */
+    iterate(i, vector.size) {           
+        @(new_types, ptr, i) = @(vector._types, ptr, i);
+    }
+    return(0);
+}
+
 define shrink(vec vector) {
     vector.allocated = vector.size;
+    
     let ptr new_data = mallocType(ptr, vector.size);
-    _copy(vector, new_data);
+    _copy_data(vector, new_data);
+    vector._data = new_data;
+
+    let ptr new_types = mallocType(u8, vector.size);
+    _copy_types(vector, new_types);
+    vector._types = new_types;
+
     return(0);
 }
 
@@ -124,11 +167,26 @@ define delete(vec vector, i32 idx) {
     let i32 i = idx;
     while (i < (vector.size - 1)) {
         @(vector._data, ptr, i) = @(vector._data, ptr, i + 1);
+        @(vector._types, u8, i) = @(vector._types, u8, i + 1);
         i++;
     }
 
     vector.size--;
     @(vector._data, ptr, vector.size) = 0 -> ptr;
+    @(vector._types, u8, vector.size) = 0 -> u8;
 
     return(removed);
+}
+
+define main() {
+    let vec ex = new(vec);
+
+    append(ex, &10, 2);
+    append(ex, &false, 8);
+    
+    iterate(i, ex.size) {
+        printf(get(ex, i));
+    }
+
+    return(0);
 }
