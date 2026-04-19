@@ -162,13 +162,13 @@ def build_unified_oper_assign(tokens, index, ltc, oper: str):
 def handle_var_ref_or_index(tokens, index, oper, lhs_ref, ltc):
     """This function is used to handle cases where the left hand side of an operator could be either a variable reference or an index operation (like x[i]). It checks the type of the left hand side and if it's not a variable reference or index operation, it tries to build an index operation if the syntax matches that pattern. If it can't, it raises a TypeError. This is used by operators like '++' and '--' that can operate on both variables and indexed expressions."""
     t = ltc.t
-    # check if the left hand side is a variable reference or an index operation (like x[i])    
-    if not isinstance(lhs_ref, (t.var_ref, n.index_oper)):
+    # check if the left hand side is a variable reference, dot operation, or an index operation (like x[i])
+    if not isinstance(lhs_ref, (t.var_ref, n.index_oper, n.dot_oper)):
         # last chance: try to build a index oper, if we cant, error
         if index >= 2 and isinstance(tokens[index - 2], t.var_ref) and isinstance(tokens[index - 1], t.array) and tokens[index - 1].get_size() == 1:
             return n.index_oper(tokens[index - 2], tokens[index - 1].val[0])
         else:
-            ltc.error(f"Left side of '{oper}' must be a variable reference or index expression")
+            ltc.error(f"Left side of '{oper}' must be a variable reference, struct field, or index expression")
     return lhs_ref
 
 def build_var_mod_shortcut_oper(tokens, index, oper: str, ltc):
@@ -266,11 +266,34 @@ def build_cast_oper(tokens, index, ltc):
     tokens[index - 1:index + 3] = [cast_node]
     
 def build_memloc_oper(tokens, index, ltc):
-    if index >= len(tokens):
+    if index + 1 >= len(tokens):
         ltc.error("Tried to call a memloc operator without a following object to take the memloc of")
-    
-    new_node = n.memloc(tokens[index + 1])
-    tokens[index:index + 2] = [new_node]
+
+    operand = tokens[index + 1]
+    cursor = index + 2
+    t = ltc.t
+
+    # `&obj.field[idx]` should take the address of the final slot, not of `obj`.
+    while cursor < len(tokens):
+        current = tokens[cursor]
+        current_val = getattr(current, "val", None)
+
+        if current_val == ".":
+            if cursor + 1 >= len(tokens):
+                ltc.error("dot operator after '&' must be followed by a field name")
+            operand = n.dot_oper(operand, tokens[cursor + 1])
+            cursor += 2
+            continue
+
+        if isinstance(current, t.array) and current.get_size() == 1:
+            operand = n.index_oper(operand, current.val[0])
+            cursor += 1
+            continue
+
+        break
+
+    new_node = n.memloc(operand)
+    tokens[index:cursor] = [new_node]
 
 def build_dot_oper(tokens, index, ltc):
     lhs = tokens[index-1]

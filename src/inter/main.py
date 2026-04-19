@@ -131,6 +131,8 @@ class State:
         self.reserved_keywords.update(self.types.keys())
         self.reserved_keywords.update(self.control_flow)
         self.reserved_keywords.update(self.function_names)
+        self.evaluate = evaluator.evaluate
+        self.execute_source_fn = execute_source
     def error(self, message, print_tokens=False, tokens=[]):
         """Centralized error handling for the LTC interpreter. This module defines custom exception classes and error handling functions to provide consistent and informative error messages throughout the interpreter. Not done yet*"""
         print("Lithic Traceback (most recent call last):")

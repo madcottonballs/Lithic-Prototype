@@ -363,6 +363,8 @@ class user_function():
 
             if actual_type_name == "ltctuple":
                 actual_type_name = "tuple"
+            elif actual_type_name == "struct_instance":
+                actual_type_name = actual_arg.struct_name
 
             if actual_type_name != expected_type_name:
                 ltc.error(

@@ -20,6 +20,21 @@ def _bind_user_function_args(call_node, arg_types, arg_names, ltc) -> None:
                 "addr": var_addr,
                 "capacity": capacity,
             }
+        elif expected_type in ltc.structs and isinstance(argument_value, ltc.t.struct_instance):
+            if argument_value.inmemory and argument_value.memloc is not None:
+                entry = {
+                    "type": expected_type,
+                    "addr": argument_value.memloc,
+                    "size": ltc.structshelper.get_struct_size(ltc, expected_type),
+                }
+            else:
+                var_addr = ltc.sp
+                ltc.helper.load_to_mem(ltc, argument_value, expected_type)
+                entry = {
+                    "type": expected_type,
+                    "addr": var_addr,
+                    "size": ltc.structshelper.get_struct_size(ltc, expected_type),
+                }
         else:
             var_addr = ltc.sp
             ltc.helper.load_to_mem(ltc, argument_value, expected_type)
@@ -64,6 +79,11 @@ def evaluate(tokens, ltc, return_values, execute_source_fn) -> list:
             for arg_idx, arg_val in enumerate(tokens[i].args):
                 # aSet needs the array variable reference as its first argument.
                 if tokens[i].val == "aSet" and arg_idx == 0 and isinstance(arg_val, t.var_ref):
+                    tokens[i].args[arg_idx] = arg_val
+                    continue
+                # let needs to preserve its declaration syntax tokens:
+                # arg0 = declared type, arg1 = variable name, arg2 = '='.
+                if tokens[i].val == "let" and arg_idx < min(3, len(tokens[i].args) - 1):
                     tokens[i].args[arg_idx] = arg_val
                     continue
                 

@@ -1,1 +1,40 @@
+/* strarrays are arrays of pointers, not a ptr to a array of ptr's *\
 
+/* load: buffer is the text you want to write, idx is the index, arr is a ptr to the array string array */
+define loadArr(string buffer, i32 idx, ptr arr) {
+    /* pass in a ptr to the ptr array*/
+    tag(arr, ptr);   /* lets us do ptr indexing */
+    arr[idx] = &buffer;
+    return(0);
+}
+
+/* read: read a string from a pointer to a string 
+you should enter the *already indexed* array element, so if you want to read the first element of the strarray, you should pass in arr[0]
+*/
+define readArr(ptr original) {
+    tag(original, char);   /* lets us do ptr indexing */
+    let string result;
+    let i32 i2;
+    while (original[i2] != '\0') {
+        result = concat(result, original[i2]);
+        i2 += 1;
+    }
+    return(result);
+}
+
+define printArr(ptr arr) {
+    tag(arr, ptr);   /* lets us do ptr indexing */
+    let i32 i;
+    while (arr[i] != 0) {
+        print(read(arr[i]));
+        i += 1;
+    }
+    return(0);
+}
+
+define strcpy(ptr base, string buffer) {
+    iterate(i, length(buffer)) {
+        @(base, char, i) = buffer[i];
+    }
+    return(0);
+}

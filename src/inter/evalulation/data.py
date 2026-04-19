@@ -1,6 +1,25 @@
 def _type_ref(ltc, token, typeref: str) -> bool:
     return isinstance(token, ltc.t.token) and token.val == typeref
 
+def _resolve_array_decl_size(array_type_token, ltc):
+    t = ltc.t
+    size = getattr(array_type_token, "size", None)
+    if size is not None:
+        return size
+
+    size_expr = getattr(array_type_token, "size_expr", None)
+    if size_expr is None:
+        ltc.error("Array declaration is missing a size")
+
+    resolved = ltc.helper.resolve_node(size_expr, ltc, [], ltc.evaluator.evaluate, None)
+    if not isinstance(resolved, t.integer):
+        ltc.error("Array size must reduce to an integer")
+    if resolved.val < 0:
+        ltc.error("Array size cannot be negative")
+
+    array_type_token.size = resolved.val
+    return resolved.val
+
 def resolve_let(tokens, i, ltc) -> None:
     t = ltc.t
     helper = ltc.helper
@@ -14,6 +33,8 @@ def resolve_let(tokens, i, ltc) -> None:
     var_value_arg = None
 
     if not isinstance(var_name_arg, t.token):
+        ltc.error("Second argument to let must be a variable name token")
+    if not isinstance(var_name_arg.val, str):
         ltc.error("Second argument to let must be a variable name token")
     if var_name_arg.val in ltc.reserved_keywords:
         ltc.error(f"Variable name '{var_name_arg.val}' is a reserved keyword")
@@ -40,21 +61,50 @@ def resolve_let(tokens, i, ltc) -> None:
             }
             tokens[i] = t.i32(0, ltc)
             return
+        
+        if type(var_value_arg).__name__ == "at_func_return":
+            var_value_arg = var_value_arg.val
+
         if type(var_value_arg) != ltc.types[var_type_arg.val]:
             ltc.error(
                 f"Type of value '{type(var_value_arg).__name__}' does not match expected type '{var_type_arg.val}'"
             )
 
         if isinstance(var_type_arg, t.array):
+            declared_size = _resolve_array_decl_size(var_type_arg, ltc)
+            if isinstance(var_value_arg, t.array) and getattr(var_value_arg, "is_type_constructor", False):
+                if var_value_arg.arrayType is None:
+                    ltc.error("Array constructor must specify an element type")
+                var_value_arg = t.array([], ltc, arrayType=var_value_arg.arrayType, parse=False)
+                var_value_arg.size = _resolve_array_decl_size(tokens[i].args[3], ltc)
+            elif isinstance(var_value_arg, t.array):
+                var_value_arg.parse(ltc)
+            if not isinstance(var_value_arg, t.array):
+                ltc.error("Typed array declarations require an array value on the right hand side")
+            if var_value_arg.arrayType != var_type_arg.arrayType:
+                ltc.error(
+                    f"Array element type mismatch: expected {var_type_arg.arrayType}, got {var_value_arg.arrayType}"
+                )
+            if var_value_arg.get_size() != declared_size:
+                ltc.error(
+                    f"Array initializer length mismatch: expected {declared_size}, got {var_value_arg.get_size()}"
+                )
             helper.load_to_mem(ltc, var_value_arg, "array")
             # vars stored for unified meta data reconstruction at end
             array_type = var_type_arg.arrayType
-            array_length = var_type_arg.get_size()
+            array_length = declared_size
         elif _type_ref(ltc, var_type_arg, "array"):
             if not isinstance(var_value_arg, t.array):
                 ltc.error("let array expects an array literal or array value on the right hand side")
-            # Ensure array literal is parsed so arrayType is inferred.
-            var_value_arg.parse(ltc)
+            if getattr(var_value_arg, "is_type_constructor", False):
+                constructor_size = _resolve_array_decl_size(var_value_arg, ltc)
+                if var_value_arg.arrayType is None:
+                    ltc.error("Array constructor must specify an element type")
+                var_value_arg = t.array([], ltc, arrayType=var_value_arg.arrayType, parse=False)
+                var_value_arg.size = constructor_size
+            else:
+                # Ensure array literal is parsed so arrayType is inferred.
+                var_value_arg.parse(ltc)
             array_type = var_value_arg.arrayType
             if array_type is None:
                 ltc.error("let array expects a non-empty array literal so element type can be inferred")
@@ -83,11 +133,11 @@ def resolve_let(tokens, i, ltc) -> None:
             return
         if isinstance(var_type_arg, t.array): # for uninitialized arrays, we still need to parse the type to get the arrayType and size info
             empty_array = t.array([], ltc, arrayType=var_type_arg.arrayType, parse=False)
-            empty_array.size = var_type_arg.size
+            empty_array.size = _resolve_array_decl_size(var_type_arg, ltc)
             helper.load_to_mem(ltc, empty_array, "array")
             # vars stored for unified meta data reconstruction at end
             array_type = var_type_arg.arrayType
-            array_length = var_type_arg.size
+            array_length = empty_array.size
         elif _type_ref(ltc, var_type_arg, "array"):
             ltc.error("let array requires an initializer; use let array x = [..];")
         elif _type_ref(ltc, var_type_arg, "string"):
@@ -249,24 +299,24 @@ def resolve_cast_function(tokens: list, i: int, ltc, return_values, evaluate, ex
         case "i32"|"i64"| "i8" | "i16" | "u32" | "u64" | "u8" | "u16": # cast to integer
             match type(source_object):
                 case t.i32 | t.i64 | t.i8 | t.i16 | t.u32 | t.u64 | t.u8 | t.u16 | t.ptr: # integer | ptr -> integer
-                    tokens[i] = ltc_target_int_class(source_object.val)
+                    tokens[i] = ltc_target_int_class(source_object.val, ltc)
                 case t.boolean: # bool -> integer
                     if source_object.val == True: # for readability
-                        tokens[i] = ltc_target_int_class(1)
+                        tokens[i] = ltc_target_int_class(1, ltc)
                     else:
-                        tokens[i] = ltc_target_int_class(0)
+                        tokens[i] = ltc_target_int_class(0, ltc)
                 case t.string: # string -> integer
                     try:
                         int_rep = int(source_object.val)
                     except ValueError:
                         ltc.error(f"Cannot cast string '{source_object.val}' to integer")
-                    tokens[i] = ltc_target_int_class(int_rep)
+                    tokens[i] = ltc_target_int_class(int_rep, ltc)
                 case t.char: # char -> integer
                     try:
                         int_rep = ord(source_object.val)
                     except ValueError:
                         ltc.error(f"Cannot cast char '{source_object.val}' to integer")
-                    tokens[i] = ltc_target_int_class(int_rep)
+                    tokens[i] = ltc_target_int_class(int_rep, ltc)
                 case _:
                     ltc.error(f"Cannot cast object of type '{type(tokens[i].args[0]).__name__}' to type '{cast_target}'")
         case "boolean": # cast to boolean
@@ -326,13 +376,13 @@ def resolve_cast_function(tokens: list, i: int, ltc, return_values, evaluate, ex
         case "ptr":
             match type(source_object):
                 case t.i32 | t.i64 | t.i8 | t.i16 | t.u32 | t.u64 | t.u8 | t.u16:
-                    tokens[i] = t.ptr(source_object.val)
+                    tokens[i] = t.ptr(source_object.val, ltc)
                 case t.string:
                     try:
                         int_rep = int(source_object.val)
                     except ValueError:
                         ltc.error(f"Cannot cast string '{source_object.val}' to ptr")
-                    tokens[i] = t.ptr(int_rep)
+                    tokens[i] = t.ptr(int_rep, ltc)
                 case t.ptr:
                     tokens[i] = source_object
                 case _:
@@ -548,6 +598,7 @@ def resolve_malloctype(tokens, i, ltc) -> None:
     count_arg = tokens[i].args[1]
     if not isinstance(type_arg, ltc.t.token) or type_arg.val not in ltc.types:
         ltc.error(f"mallocType type argument must be a valid type, got {type(type_arg).__name__}")
+    count_arg = ltc.helper.resolve_node(count_arg, ltc, [], ltc.evaluator.evaluate, None)
     if not isinstance(count_arg, ltc.t.integer):
         ltc.error(f"mallocType count argument must be an integer, got {type(count_arg).__name__}")
 
@@ -555,7 +606,7 @@ def resolve_malloctype(tokens, i, ltc) -> None:
 
     ltc.helper.malloc(num_of_bytes, ltc)
 
-    tokens[i] = ltc.t.ptr(ltc.hp) 
+    tokens[i] = ltc.t.ptr(ltc.hp, ltc) 
 
 def resolve_malloc(tokens, i, ltc) -> None:
     if len(tokens[i].args) != 1:

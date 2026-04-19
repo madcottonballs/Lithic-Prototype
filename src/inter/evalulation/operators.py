@@ -71,7 +71,7 @@ def resolve_opers(tokens, i, ltc, return_values, evaluate, execute_source_fn=Non
             resolve_free_oper(tokens, i, ltc)
             return True
         elif isinstance(tokens[i], n.memloc):
-            resolve_memloc_oper(tokens, i, ltc)
+            resolve_memloc_oper(tokens, i, ltc, return_values, evaluate, execute_source_fn)
             return True
     elif isinstance(tokens[i], n.oper):
         if isinstance(tokens[i], n.dot_oper):
@@ -272,6 +272,8 @@ def resolve_assign_oper(tokens, i, ltc, return_values, evaluate, execute_source_
         target = tokens[i].node1
 
         rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
+        if type(rhs).__name__ == "at_func_return":
+            rhs = rhs.val
         helper.load_to_mem(ltc, rhs, type(rhs).__name__, memidx=target.addr)
         tokens[i] = t.i32(0, ltc)
         return
@@ -431,7 +433,9 @@ def resolve_bool_oper(ltc, tokens, i, oper: str, return_values, evaluate, execut
 
     rhs = helper.resolve_node(tokens[i].node2, ltc, return_values, evaluate, execute_source_fn)
 
-    if type(lhs).__name__ != type(rhs).__name__:
+    if isinstance(lhs, t.integer) and isinstance(rhs, t.integer):
+        pass
+    elif type(lhs).__name__ != type(rhs).__name__:
         ltc.error(f"Type mismatch in equality operator '{type(lhs).__name__}: {lhs.val} {oper} {type(rhs).__name__}: {rhs.val}'")
 
     match oper:
@@ -471,14 +475,17 @@ def resolve_free_oper(tokens, i, ltc):
     var_data = helper.locate_var_in_namespace(ltc.namespace, var_name, return_just_the_check=False) # var_data is (metadata, scope_level)
     del ltc.namespace[var_data[1]][var_name]
 
-def resolve_memloc_oper(tokens, i, ltc):
+def resolve_memloc_oper(tokens, i, ltc, return_values=None, evaluate=None, execute_source_fn=None):
     t = ltc.t
     rhs = tokens[i].node
 
     if isinstance(rhs, ltc.n.index_oper):
         helper = ltc.helper
         base = rhs.node1
-        idx = helper.resolve_node(rhs.node2, ltc, None, None, None)
+        idx_node = rhs.node2
+        if isinstance(idx_node, t.token) and helper.locate_var_in_namespace(ltc.namespace, idx_node.val, return_just_the_check=True):
+            idx_node = t.var_ref(idx_node.val)
+        idx = helper.resolve_node(idx_node, ltc, [], ltc.evaluator.evaluate, None)
         if not isinstance(idx, t.integer):
             ltc.error("Index must resolve to an integer")
 
@@ -508,7 +515,19 @@ def resolve_memloc_oper(tokens, i, ltc):
             base_addr = base.memloc
             elem_type = base.arrayType
         else:
-            ltc.error("memloc indexing only supports tuple and array bases")
+            resolved_base = helper.resolve_node(base, ltc, [], ltc.evaluator.evaluate, None)
+            if isinstance(resolved_base, t.ltctuple):
+                if not resolved_base.inmemory or resolved_base.memloc is None:
+                    ltc.error("memloc tuple indexing requires a tuple stored in memory")
+                base_addr = resolved_base.memloc
+                element_types = resolved_base.element_types
+            elif isinstance(resolved_base, t.array):
+                if not resolved_base.inmemory or resolved_base.memloc is None:
+                    ltc.error("memloc array indexing requires an array stored in memory")
+                base_addr = resolved_base.memloc
+                elem_type = resolved_base.arrayType
+            else:
+                ltc.error("memloc indexing only supports tuple and array bases")
 
         index_val = idx.val
         if element_types is not None:
@@ -525,10 +544,7 @@ def resolve_memloc_oper(tokens, i, ltc):
         tokens[i] = t.ptr(elem_addr, ltc)
         return
 
-    if not isinstance(rhs, t.ltc_type | t.var_ref):
-        ltc.error(f"memloc operator takes a ltc_type or var_ref, not '{type(tokens[i].node).__name__}'")
-
-    rhs = ltc.helper.resolve_node(rhs, ltc, None, None, None) # can just pass None for the last three arguments since resolve_node will not use them when resolving a var_ref
+    rhs = ltc.helper.resolve_node(rhs, ltc, return_values, evaluate, execute_source_fn)
 
     # Strings are dynamic and stack-lifetime; take a stable heap copy for '&string'.
     if isinstance(rhs, t.string):
@@ -540,8 +556,11 @@ def resolve_memloc_oper(tokens, i, ltc):
         tokens[i] = t.ptr(addr, ltc)
         return
 
-    if not rhs.inmemory:
-        ltc.error(f"Object '{rhs.val}' of type '{type(rhs).__name__}' is not stored in memory and thus does not have a memory address. This error exists only in the interpreter version.")
+    if not tokens[i].node.inmemory:
+        tokens[i].node.memloc = ltc.sp
+        tokens[i].node.inmemory = True
+        ltc.helper.load_to_mem(ltc, tokens[i].node)
+        rhs = tokens[i].node
 
     tokens[i] = t.ptr(rhs.memloc, ltc)
 

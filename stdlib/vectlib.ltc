@@ -1,56 +1,134 @@
-vectors.ltc:
+/* 
+    vectlib.ltc is a stdlib for heterogenous resizable vectors
+    vectors are implemented using the vec struct, which has the fields
+        u8 size
+        u8 allocated
+        ptr _data
+    size defaults to 0 and allocated defaults to 1
+    functions:
+        append(vec vector, ptr obj)
+            appends the object to the end of the vector
+            if size has reached or exceeded allocated, contents of the vector are copied to a new location and allocated is doubled
+            returns 0 for no errors
+        get(vec vector, i32 idx, string type)
+            returns the object located at an index in the vector
+            the type (ex: "i32") lets the function know what type the element in the vector is
+            you must keep track of the types of the elements yourself
+            exit(1) if idx is greater than or equal to size, otherwise return the object
+            supported types currently are i64, i32, i16, i8, u8, u16, u32, u64, boolean, and char
+        set(vec vector, i32 idx, ptr new_obj)
+            sets an element to be a new obj
+            new_obj paramter must be a reference to the obj, not the obj itself
+            if idx is greater than or equal to size, element is not changed and return(1) otherwise return(0)
+        shrink(vec vector)
+            copies the contents of the vector to a new location, then reduces allocated to size
+            vec.allocated = vec.size
+        delete(vec vector, i32 idx)
+            removes the element at the specified index
+            does so by shifting left all elements until the final element is a null ptr
+            returns the deleted ptr, or null ptr if idx is not valid
+*/
 
-include<dw.ltc>;
-include<bool.ltc>;
-include<chr.ltc>;
-include<>
-
-dw.ltc:
-
-define make(string type, dword size) {
-    let dword allocated = size * 2 + 2;                  /* buffer is for [allocated][size]*/	
-    let dword[allocated] instance;
-	instance[0] = allocated;
-	instance[1] = size;
-    return(&instance);
+struct vec {
+    let u8 size = 0;
+    let u8 allocated = 1;
+    let ptr _data;
 }
 
-define get(ptr instance, dword idx) {
-	let dword allocated = @(instance)
-	let dword size = @(instance + 1);
-	if (idx > size) {
-		printf(“tried to index outside of vector bounds”)
-		exit(1);
-    }
-    let dword return_value = @(instance + idx + 2);
-    return(return_value)
-}
+define append(vec vector, ptr obj) {
+    if ((vector.size + 1) >= vector.allocated) {
+        vector.allocated**;
+        let ptr new_data = mallocType(ptr, vector.allocated);
 
-define append(ptr instance, dword val) {
-	let dword allocated = @(instance);
-	let dword full_byte_size = (2 * sizeof(dword)) + (allocated * sizeof(dword));
-	let dword size = @(instance + 1);
-	size++;
-    if (size > allocated) {
-        let ptr new_instance = dw_make(“dword”, size);
-        iterate (i, size) {
-            let dword ir = dw_get(instance, i);
-            dw_set(new_instance, ir);
-        }
-        return(new_instance);
-    }
-    else {
-        @(instance + 2 + size) = val;
-        return(instance);
-    }
-}
+        _copy(vector, new_data)
 
-define set(ptr instance, dword idx, dword new_val) {
-	let dword size = @(instance + 1);
-	if (idx > size) {
-		printf(“tried to index outside of vector bounds”)
-	exit(1);
+        vector._data = new_data;
     }
-    @(instance + 2 + idx) = new_val;
+    @(vector._data, ptr, vector.size) = obj;
+    vector.size++;
     return(0);
+}
+
+define get(vec vector, i32 idx, string type) {
+    if (idx >= vector.size) {
+        exit(1);
+    }
+    
+    let ptr element = @(vector._data, ptr, idx)
+
+    if (type == "i32") {
+        return( @(element, i32, 0) );
+    }
+    if (type == "i64") {
+        return( @(element, i64, 0) );
+    }
+    if (type == "i16") {
+        return( @(element, i16, 0) );
+    }
+    if (type == "i8") {
+        return( @(element, i8, 0) );
+    }
+    if (type == "u64") {
+        return( @(element, u64, 0) );
+    }
+    if (type == "u32") {
+        return( @(element, u32, 0) );
+    }
+    if (type == "u16") {
+        return( @(element, u16, 0) );
+    }
+    if (type == "u8") {
+        return( @(element, u8, 0) );
+    }
+    if (type == "char") {
+        return( @(element, char, 0) );
+    }
+    if (type == "boolean") {
+        return( @(element, boolean, 0) );
+    }
+}
+
+define set(vec vector, i32 idx, ptr new_obj) {
+    if (idx >= vector.size) {
+        return(1);
+    }
+    @(vector._data, ptr, idx) = new_obj;
+    return(0);
+}
+
+define _copy(vec vector, ptr new_data) {
+    /* 
+        this func copies the contents of the vector _data to a new location 
+        the new_data ptr must have enough room for the entire vector size or undefined behavior will occur
+    */
+    iterate(i, vector.size) {           
+        @(new_data, ptr, i) = @(vector._data, ptr, i);
+    }
+    return(0);
+}
+
+define shrink(vec vector) {
+    vector.allocated = vector.size;
+    let ptr new_data = mallocType(ptr, vector.size);
+    _copy(vector, new_data);
+    return(0);
+}
+
+define delete(vec vector, i32 idx) {
+    if (idx >= vector.size) {
+        return(0); 
+    }
+
+    let ptr removed = @(vector._data, ptr, idx);
+
+    let i32 i = idx;
+    while (i < (vector.size - 1)) {
+        @(vector._data, ptr, i) = @(vector._data, ptr, i + 1);
+        i++;
+    }
+
+    vector.size--;
+    @(vector._data, ptr, vector.size) = 0 -> ptr;
+
+    return(removed);
 }

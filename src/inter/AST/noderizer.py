@@ -74,11 +74,11 @@ def generate_trees(tokens, ltc, start_index=0):
     if not isinstance(tokens, list):
         return
 
-    # Pass 0: collapse array type declarations like `i32[4]` into one array token.
-    _build_array_type_tokens(tokens, ltc, start_index)
-
-    # Pass 1: collapse raw parenthesized ranges into `subexp` nodes.
+    # Pass 0: collapse raw parenthesized ranges into `subexp` nodes.
     build_subexp(start_index, tokens, ltc)
+    # Pass 1: collapse array type declarations like `i32[4]` or `ptr[length(x)]`
+    # into one array token.
+    _build_array_type_tokens(tokens, ltc, start_index)
     # Pass 1.25: collapse array literals like `[1, 2]` into one `array` token.
     _build_array_literals(tokens, ltc, start_index)
     # Pass 1.5: convert let statements in intended syntax to a function node.
@@ -89,9 +89,30 @@ def generate_trees(tokens, ltc, start_index=0):
 
     # Indexing has higher precedence than arithmetic/comparisons.
     _build_indexing(start_index, tokens, ltc)
+    _build_dot_access(start_index, tokens, ltc)
     
     _build_add_sub_mult_div_nodes(start_index, tokens, ltc)
     _build_opers(tokens, start_index, ltc)
+
+def _build_dot_access(start_index, tokens, ltc):
+    t = ltc.t
+    index = start_index
+    while index < len(tokens):
+        if type(tokens[index]) is not t.token or getattr(tokens[index], "val", None) != ".":
+            index += 1
+            continue
+
+        build_dot_oper(tokens, index, ltc)
+        collapsed_index = max(index - 1, 0)
+        if (
+            collapsed_index + 1 < len(tokens)
+            and isinstance(tokens[collapsed_index], dot_oper | index_oper)
+            and isinstance(tokens[collapsed_index + 1], t.array)
+            and tokens[collapsed_index + 1].get_size() == 1
+        ):
+            _build_index_node(tokens[collapsed_index], tokens[collapsed_index + 1], tokens, collapsed_index, ltc)
+
+        index = max(collapsed_index, start_index)
 
 def _build_indexing(start_index, tokens, ltc):
     index = start_index
@@ -190,7 +211,7 @@ def _build_let_stmts(start_index, tokens, ltc):
         index += 1
 
 def _build_array_type_tokens(tokens, ltc, start_index=0):
-    """Convert `<type>[<i32>]` into one `t.array` type token.
+    """Convert `<type>[<expr>]` into one `t.array` type token.
 
     Example:
       [token('i32'), token('['), i32(2), token(']')]
@@ -198,11 +219,9 @@ def _build_array_type_tokens(tokens, ltc, start_index=0):
     """
     t = ltc.t
     index = start_index
-    while index + 3 < len(tokens):
+    while index + 2 < len(tokens):
         type_token = tokens[index]
         open_bracket = tokens[index + 1]
-        size_token = tokens[index + 2]
-        close_bracket = tokens[index + 3]
 
         is_primitive_type = (
             isinstance(type_token, t.token)
@@ -221,18 +240,43 @@ def _build_array_type_tokens(tokens, ltc, start_index=0):
             index += 1
             continue
 
-        if not isinstance(size_token, t.i32):
-            ltc.error("Array size must be a i32 literal in type declaration")
-        if size_token.val < 0:
-            ltc.error("Array size cannot be negative")
-        if getattr(close_bracket, "val", None) != "]":
+        bracket_depth = 1
+        close_index = index + 2
+        while close_index < len(tokens):
+            current_symbol = getattr(tokens[close_index], "val", None)
+            if current_symbol == "[":
+                bracket_depth += 1
+            elif current_symbol == "]":
+                bracket_depth -= 1
+                if bracket_depth == 0:
+                    break
+            close_index += 1
+
+        if close_index >= len(tokens) or getattr(tokens[close_index], "val", None) != "]":
             ltc.error("Array type declaration is missing closing ']'")
+
+        size_tokens = tokens[index + 2:close_index]
+        if not size_tokens:
+            ltc.error("Array type declaration requires a size expression")
+
+        generate_trees(size_tokens, ltc, 0)
+        if len(size_tokens) != 1:
+            ltc.error("Array size expression did not reduce to a single value")
+
+        size_token = size_tokens[0]
 
         # Reuse your existing array class as a type token.
         array_type_token = t.array([], ltc, arrayType=type_token.val, parse=False)
         array_type_token.val = "array"
-        array_type_token.size = size_token.val
-        tokens[index:index + 4] = [array_type_token]
+        if isinstance(size_token, t.integer):
+            if size_token.val < 0:
+                ltc.error("Array size cannot be negative")
+            array_type_token.size = size_token.val
+        else:
+            array_type_token.size = None
+            array_type_token.size_expr = size_token
+        array_type_token.is_type_constructor = True
+        tokens[index:close_index + 1] = [array_type_token]
         # Do not increment index so chained patterns still get parsed correctly.
 
 def _build_array_literals(tokens, ltc, start_index=0):

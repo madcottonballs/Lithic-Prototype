@@ -1,21 +1,33 @@
-
-struct Bar {
-    let char[50] example;
-    
-}
+import "stringlib.ltc" as "str";
 
 define main() {
-    let Bar b = new(Bar);
-    let string buffer = input();
-    if (length(buffer) > 50) {
-        exit(1);
+    printf("'cls' to exit the program.");
+    let string user;
+
+    while (user != "cls") {
+        print(">>>");
+        user = input();
+
+        let array tokens = split(user, [' ', '+', '-', '*', '/'], true); /* tokens is a string array */
+
+        let array keeps = boolean[length(tokens)];
+        let i32 num_of_keeps;
+
+        iterate(i, length(tokens)) {
+            if (str.readArr(tokens[i]) != "") {
+                if (str.readArr(tokens[i]) != " ") {
+                    keeps[i] = true;
+                    num_of_keeps++;
+                }
+            }
+        }
+        let array tokens = ptr[num_of_keeps];
+
+        /* prints tokens*/
+        iterate(i, length(tokens)) {
+            printf(str.readArr(tokens[i]));
+        }
     }
-    iterate(i, length(buffer)) {
-        b.example[i] = buffer[i];
-    }
-    iterate(i, length(buffer)) {
-        printf(b.example[i])
-    }
+
     return(0);
 }
-
