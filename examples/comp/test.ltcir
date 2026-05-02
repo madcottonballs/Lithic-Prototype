@@ -5,12 +5,15 @@ define #main
 end #main
 
 define #ltc_main
-    make_var i32 -> %num1
-    make_var i32 -> %num2
-    mov $5 -> %num1
-    mov $10 -> %num2
-    call #ltcadd %num1 %num2 -> %num1
-    print %num1
+    make_var string -> %test
+    make_var char -> %chartest
+
+    print ">>>"
+    input -> %test
+
+    print "you said: "
+    printf %test
+
     ret i32 $0
 end #ltc_main
 

@@ -1,5 +1,5 @@
 use std::env;
-use Compiler;
+use crate::Compiler;
 
 pub fn c_type_to_formatter(ltcir_type: &str) -> &str {
     match ltcir_type {
@@ -36,9 +36,13 @@ pub fn resolve_includes(compiler: &mut Compiler) -> usize{ // this function will
         compiler.target.insert(0, "#include <iostream>".to_string()); // add iostream include if using std::cout, this is needed for printing to the console in C++
         count += 1;
     }
+    if compiler.using_string {
+        compiler.target.insert(0, "#include <string>".to_string()); // add iostream include if using std::cout, this is needed for printing to the console in C++
+        count += 1;
+    }
     return count;
 }
-pub fn convert_type(ltcir_type: &str) -> &str {
+pub fn convert_type(ltcir_type: &str) -> &str { // this function converts a ltcir type to it's renamed cpp equivalent
     match ltcir_type {
         "i32" => "i32", // use fixed-width integer types from stdint.h for 32-bit integers
         "u32" => "u32", // use fixed-width integer types from stdint.h for 32-bit integers
@@ -48,7 +52,7 @@ pub fn convert_type(ltcir_type: &str) -> &str {
         "u16" => "u16", // use fixed-width integer types from stdint.h for 16-bit integers
         "i8" => "i8", // use fixed-width integer types from stdint.h for 8-bit integers
         "u8" => "u8", // use fixed-width integer types from stdint.h for 8-bit integers
-        "string" => "char*",
+        "string" => "string",
         "boolean" => "bool",
         "char" => "char",
         _ => {

@@ -1,3 +1,4 @@
+#include <string>
 #include <iostream>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #define u16 uint16_t
 #define i8 int8_t
 #define u8 uint8_t
+#define string std::string
 int main(void);
 void ltc_main(void* ret);
 void ltcadd(void* ret, i32 arg0, i32 arg1);
@@ -19,12 +21,15 @@ int main(void) {
 	exit(return_value);
 }
 void ltc_main(void* ret) {
-	i32 num1;
-	i32 num2;
-	num1 = 5;
-	num2 = 10;
-	ltcadd(&num1, num1, num2);
-	std::cout << num1 << "\n";
+	string test;
+	char chartest;
+
+	std::cout << ">>>";
+	std::getline(std::cin, test);
+
+	std::cout << "you said: ";
+	std::cout << test << "\n";
+
 	*(i32*)ret = 0;
 }
 void ltcadd(void* ret, i32 arg0, i32 arg1) {

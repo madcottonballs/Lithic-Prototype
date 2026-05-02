@@ -1,7 +1,0 @@
-struct Bad {
-    i32 x;
-}
-
-define main() {
-    return(0);
-}

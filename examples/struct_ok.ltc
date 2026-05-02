@@ -1,4 +1,5 @@
 import "stringlib.ltc" as "str";
+import "vectlib.ltc" as "v"
 
 define main() {
     printf("'cls' to exit the program.");
@@ -7,7 +8,7 @@ define main() {
     while (user != "cls") {
         print(">>>");
         user = input();
-
+        
         let array tokens = split(user, [' ', '+', '-', '*', '/'], true); /* tokens is a string array */
 
         let array keeps = boolean[length(tokens)];
@@ -27,6 +28,7 @@ define main() {
         iterate(i, length(tokens)) {
             printf(str.readArr(tokens[i]));
         }
+        
     }
 
     return(0);

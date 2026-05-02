@@ -27,35 +27,49 @@
 ## Info
 *       Entry point is the #main function.
 *       To return a value from the #main function, you must use exit [any], NOT ret [type] [any]
+*       No errors but syntax errors are checked for.
+*       The star '*' is used to denote comments
 
-## misc functions
-###     add [integer] [integer] -> [var]
+
+## Arithmatic
+###     add integer integer -> var
         Adds the first 2 args and saves in the last.
 
-###    *sub [integer] [integer] -> [var] 
+###    sub integer integer -> var 
         Subtracts the first 2 args and saves in the last.
 
-###    *mult [integer] [integer] -> [var]
+###    mult integer integer -> var
         Multiplies the first 2 args and saves in the last.
 
-###    *div [integer] [integer] -> [var]
+###    div integer integer -> var
         Adds the first 2 args and saves in the last.
-
-###     print [any]
-        Prints the 1st argument with a \n.
+## Terminal
+###     printf any
+        Prints the 1st argument with a newline character.
         Does not flush.
+###     print any
+        Prints the 1st argument with no newline character.
+        Does not flush.
+###     flush
+        Flushes the IO stream.
+###     input -> var
+Prompts user input from the terminal and stores the result into the var.
+Prints a newline character after the input is read.
 
-###     make_var [type] -> [var]
+## misc functions
+
+###     make_var type -> var
         Initalizes a variable with that type.
 
-###     mov [any] -> [var]
+###     mov any -> var
         Sets an existing variable to have the value of arg 1.
-
-###    *inlineCpp [string_lit]
+###     typeof any -> var
+        Loads the type of the data entered into the variable as a string.
+###    *inlineCpp string
         Writes the text entered into the generated C++ file.
-###    *inlineAsm [string_lit]
+###    *inlineAsm string
         Writes the text entered into the generated Asm file.
-
+## file IO
 ###   *file_open [string] [string] -> [file]
         Opens the file referenced by the first string and saves it in the file reference. The mode of the file opening is the 2nd string. Valid modes are "r" for reading and "w" for write.  
 ###   *file_close [file]
@@ -92,23 +106,32 @@
         Immediately writes all content stored in the file buffer to disk. 
 
 ###     define #[func] [arg_type]
-        Opens a function body. 
-        All following tokens should be type references that equate to the types of the parameters.
-        In the function block, all parameters passed into the function are automatically made into sequential variables.
-        Ex:
+Opens a function body. 
+All following tokens should be type references that equate to the types of the parameters.
+In the function block, all parameters passed into the function are automatically made into sequential variables.
+Ex:
 ```
-                define #add i32 i32
-                        make_var i32 -> %return_val
-                        add i32 %arg0 %arg1 -> %return_val
-                        ret %return_val
-                end #add
+define #add i32 i32
+        make_var i32 -> %return_val
+        add i32 %arg0 %arg1 -> %return_val
+        ret %return_val
+end #add
 
-                define #main i32
-                        make_var i32 -> %return_val
-                        call add $5 $9 -> i32 %return_val
-                        ret %return_val
-                end #main
+define #main i32
+        make_var i32 -> %return_val
+        call add $5 $9 -> i32 %return_val
+        ret %return_val
+end #main
 ```
+Basic set up for a function:
+```
+define #ltc_main
+
+    ret i32 $0
+
+end #ltc_main
+```
+
 ###    end #[func]
         Ends a function body.
 ###    call #[func] [any] -> [type] [var]
@@ -123,7 +146,18 @@
 ###     ret [type] [any]
         Exits the function, returning to caller.
         Also returns the specified value (arg 2) to the caller. 
-###     flush
-        Flushes the IO stream.
+
 ## boolean functions
-###     equal [boolean] [boolean]
+###     equal any any -> var
+Checks if both are the same, stores result in the variable.
+###     greater integer integer -> var
+Checks if the left side is greater than the right side, stores result in the variable.
+###     less integer integer -> var
+Checks if the left side is less than the right side, stores result in the variable.
+
+###     and boolean boolean -> var
+Runs a logical and operation on the boolean arguments and saves the result in the variable.
+###     or boolean boolean -> var
+Runs a logical or operation on the boolean arguments and saves the result in the variable.
+###     not boolean -> var
+Runs a logical not operation on the boolean argument and saves the result in the variable.

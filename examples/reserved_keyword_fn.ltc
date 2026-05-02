@@ -1,7 +1,0 @@
-define not() {
-    return(0);
-}
-
-define main() {
-    return(0);
-}

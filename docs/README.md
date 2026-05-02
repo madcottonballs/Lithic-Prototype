@@ -225,6 +225,7 @@ let array y = [5, 2, 9];
 You can enter anything into this function.
 Some things may work, some may not.
 Will return the type of the data types as a string.
+Compile-time checked.
 
 ###		sizeof(any)
 Will return the byte size of each data type as a i32.

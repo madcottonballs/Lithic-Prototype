@@ -1,6 +1,5 @@
-use lexer;
-use Compiler;
-use helper;
+use crate::helper;
+use crate::{lexer, Compiler};
 #[derive(Debug)]
 pub struct Token {
     pub value: String,
@@ -73,6 +72,10 @@ pub fn parser(intermediate: Vec<String>, compiler: &Compiler) -> Vec<Token> {
         if token.value.starts_with('"') && token.value.ends_with('"') {
             token.value = token.value.trim_matches('"').to_string();  // remove surrounding quotes
             token.type_ = "string".to_string();
+        }
+        if token.value.starts_with('\'') && token.value.ends_with('\'') && token.value.len() >= 3 {
+            token.value = token.value.trim_matches('\'').to_string();
+            token.type_ = "char".to_string();
         }
         if token.value.starts_with("$") {
             token.value = token.value.trim_start_matches('$').to_string();  // remove leading $
