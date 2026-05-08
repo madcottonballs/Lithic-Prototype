@@ -7,6 +7,44 @@ use compiler::compile_file;
 use std::collections::HashMap;
 use std::fs;
 
+/*
+IMPORTANT INFO
+
+run a test using the command "python "src\comp\test.py""
+
+tokens is a Vec<Token>
+the Token class has 
+    .value attribute (String)
+        type prefixes (like | or $ or %) are NOT included in the .value attribute
+        type prefixes for text data types are NOT removed ("hello world" is stored as a rust String " \"hello world\" ")
+        ex: $20 is stored as "20"
+    ._type attribute (String)
+        ._type is resolved in parser.parser()
+        ._type can be:
+            generic
+                means unclassified
+            string
+                double quoted text
+            char
+                single quoted text
+            integer
+                defined with a $ sign
+            variable
+                defined with a % sign
+            function
+                defined with a # sign
+            boolean
+                defined with a | sign
+            arrow
+                defined by .value being a "->"
+            keyword
+                defined by having .value be a String in compiler.keywords
+            type
+                defined by having .value be a String in compiler.type_names
+
+*/
+
+
 struct Compiler {
     keywords: Vec<String>,
     type_names: Vec<String>,
@@ -176,6 +214,14 @@ fn lexer(source_line: &str) -> Vec<String> {
     tokens
 }
 
+fn check_file_ext(source_file_parts: &Vec<&str>) {
+    let file_extension: &str = source_file_parts.last().unwrap_or(&""); // get file extension, this should be the last element of the source_file_parts vector, if there is no extension, use an empty string
+    if file_extension != "ltcir" {
+        println!("Error: Source file must have .ltcir extension");
+        std::process::exit(1);
+    } // check file extension, if it's not .ltcir, print error message and exit
+}
+
 fn main() {
     let args: Vec<String> = get_sys_args(); // get command line arguments, this should return a Vec<String> where the first element is the program name and the second element is the source file name
 
@@ -183,11 +229,7 @@ fn main() {
     
     let source_file_parts: Vec<&str> = source_file.split('.').collect();  // split source file name by '.', this will be used to check file extension and get file name without extension
     
-    let file_extension: &str = source_file_parts.last().unwrap_or(&""); // get file extension, this should be the last element of the source_file_parts vector, if there is no extension, use an empty string
-    if file_extension != "ltcir" {
-        println!("Error: Source file must have .ltcir extension");
-        std::process::exit(1);
-    } // check file extension, if it's not .ltcir, print error message and exit
+    check_file_ext(&source_file_parts);
 
     let output_file_name: String = if source_file_parts.len() > 1 {   source_file_parts[..source_file_parts.len() - 1].join(".")  } else {String::new()}; // get file name without extension, this will be used for output file name
     

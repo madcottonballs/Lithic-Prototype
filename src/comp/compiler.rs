@@ -171,15 +171,7 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
 
-            let value = if tokens[1].type_ == "string" {
-                format!("\"{}\"", tokens[1].value)
-            } else if tokens[1].type_ == "char" {
-                format!("\'{}\'", tokens[1].value)
-            } else {
-                tokens[1].value.clone()
-            };            
-
-            target_line = format!("\tstd::cout << {} << \"\\n\";",  value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+            target_line = format!("\tstd::cout << {} << \"\\n\";",  tokens[1].value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
             compiler.using_stdio = true; // mark that we're using the standard io, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
             compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
             }

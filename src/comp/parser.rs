@@ -70,11 +70,9 @@ pub fn parser(intermediate: Vec<String>, compiler: &Compiler) -> Vec<Token> {
             continue;  // skip tokens that have already been classified
         }
         if token.value.starts_with('"') && token.value.ends_with('"') {
-            token.value = token.value.trim_matches('"').to_string();  // remove surrounding quotes
             token.type_ = "string".to_string();
         }
         if token.value.starts_with('\'') && token.value.ends_with('\'') && token.value.len() >= 3 {
-            token.value = token.value.trim_matches('\'').to_string();
             token.type_ = "char".to_string();
         }
         if token.value.starts_with("$") {
@@ -107,6 +105,9 @@ pub fn parser(intermediate: Vec<String>, compiler: &Compiler) -> Vec<Token> {
 }
 
 pub fn find_functions(source_code: &str) -> Vec<Func> {
+    /*
+    Takes the source code file as a &str and returns a vector containing all the Func objects for individual parsing
+    */
     let mut lineidx = 0;
     let mut functions: Vec<Func> = Vec::new();  // this will hold the source code blocks for each function found             
     let source_lines: Vec<String> = source_code.lines().map(|line| line.to_string()).collect();  // split source code into lines

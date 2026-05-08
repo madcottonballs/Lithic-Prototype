@@ -5,14 +5,10 @@ define #main
 end #main
 
 define #ltc_main
-    make_var string -> %test
-    make_var char -> %chartest
+    make_var string -> %retval
+    call #stringrettest -> %retval
 
-    print ">>>"
-    input -> %test
-
-    print "you said: "
-    printf %test
+    printf %retval
 
     ret i32 $0
 end #ltc_main
@@ -22,3 +18,7 @@ define #ltcadd i32 i32
     add %arg0 %arg1 -> %test
     ret i32 %test
 end #ltcadd
+
+define #stringrettest
+    ret string "hello world"
+end #stringrettest
