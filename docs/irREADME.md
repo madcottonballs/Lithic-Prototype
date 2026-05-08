@@ -23,6 +23,7 @@
 ###     string
 ###     char
 ###     boolean
+###     ptr
 
 ## Info
 *       Entry point is the #main function.
@@ -55,6 +56,15 @@
 ###     input -> var
 Prompts user input from the terminal and stores the result into the var.
 Prints a newline character after the input is read.
+
+## Memory
+###     malloc integer_lit -> var
+Allocates n number of bytes and saves it as a ptr.
+void* under the hood.
+###     get_at var type integer -> var
+Casts the ptr to the specified type, then returns the indexed value in the ptr's memory.
+###     set_at any -> var type integer
+Casts the ptr to the specified type, then sets the indexed value in the ptr's memory.
 
 ## misc functions
 

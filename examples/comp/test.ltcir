@@ -5,20 +5,15 @@ define #main
 end #main
 
 define #ltc_main
-    make_var string -> %retval
-    call #stringrettest -> %retval
+    make_var ptr -> %exam
+    malloc 100 -> %exam
 
-    printf %retval
+    make_var u8 -> %test
+
+    set_at 50 -> %exam u8 0
+    get_at %exam u8 0 -> %test
+    printf %test
+    free %exam
 
     ret i32 $0
 end #ltc_main
-
-define #ltcadd i32 i32
-    make_var i32 -> %test
-    add %arg0 %arg1 -> %test
-    ret i32 %test
-end #ltcadd
-
-define #stringrettest
-    ret string "hello world"
-end #stringrettest

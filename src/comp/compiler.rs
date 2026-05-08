@@ -171,7 +171,13 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
 
-            target_line = format!("\tstd::cout << {} << \"\\n\";",  tokens[1].value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+            let output_expr: String = if tokens[1].type_ == "u8" || tokens[1].type_ == "i8" {
+                format!("static_cast<int>({})", tokens[1].value)
+            } else {
+                tokens[1].value.clone()
+            };
+
+            target_line = format!("\tstd::cout << {} << \"\\n\";",  output_expr);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
             compiler.using_stdio = true; // mark that we're using the standard io, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
             compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
             }
@@ -181,15 +187,14 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
             
-            let value = if tokens[1].type_ == "string" {
-                format!("\"{}\"", tokens[1].value)
-            } else if tokens[1].type_ == "char" {
-                format!("\'{}\'", tokens[1].value)
+            let output_expr: String = if tokens[1].type_ == "u8" || tokens[1].type_ == "i8" {
+                format!("static_cast<int>({})", tokens[1].value)
             } else {
                 tokens[1].value.clone()
-            };            
+            };
 
-            target_line = format!("\tstd::cout << {};",  value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+
+            target_line = format!("\tstd::cout << {};",  output_expr);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
             compiler.using_stdio = true; // mark that we're using the standard io, this will be used to determine whether we need to include stdlib.h at the top of the generated C code
             compiler.using_iostream = true; // mark that we're using iostream, this will be used to determine whether we need to include iostream at the top of the generated C++ code
             }
@@ -323,6 +328,51 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
                 let dest = &tokens[4].value;
                 target_line = format!("\t{} = {} < {};", dest, lhs, rhs);
         }
+        "malloc" => // malloc [integer] -> [dest_var]
+            {
+            if tokens.len() != 4 {
+                println!("Error: 'malloc' instruction requires exactly 4 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let dest = &tokens[3].value;
+            let size = &tokens[1].value;
+            target_line = format!("\t{} = calloc({}, 1);", dest, size);  // generate C code for malloc instruction. C++ Calloc is used to initalize the data to 0
+            }
+        "free" => // free [ptr]
+            {
+            if tokens.len() != 2 {
+                println!("Error: 'free' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let free = &tokens[1].value;
+            target_line = format!("\tfree({});", free);  // generate C code for free instruction
+            }
+
+        "get_at" => // get_at [var] [type] [integer] -> [dest_var]
+            {
+            if tokens.len() != 6 {
+                println!("Error: 'get_at' instruction requires exactly 6 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let dest = &tokens[5].value;
+            let idx = &tokens[3].value;
+            let _type = &tokens[2].value;
+            let origin = &tokens[1].value;
+            target_line = format!("\t{} = (({}*){})[{}];", dest, _type, origin, idx);  // generate C code for get_at instruction
+            }
+        "set_at" => // set_at [any] -> [dest var] [type] [integer]
+            {
+            if tokens.len() != 6 {
+                println!("Error: 'set_at' instruction requires exactly 6 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let dest = &tokens[3].value;
+            let idx = &tokens[5].value;
+            let _type = &tokens[4].value;
+            let origin = &tokens[1].value;
+            target_line = format!("\t(({}*){})[{}] = {};", _type, dest, idx, origin);  // generate C code for get_at instruction
+            }
+
 
         _ => {
             println!("Error: Unknown keyword '{}'", tokens[0].value);

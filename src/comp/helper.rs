@@ -11,6 +11,7 @@ pub fn c_type_to_formatter(ltcir_type: &str) -> &str {
         "unsigned long long" => "%llu",
         "char" => "%c",
         "char*" => "%s",
+        "void*" => "%p",
         "bool" => "%d", // we'll print booleans as integers (0 or 1)
         _ => {
             println!("Error: Unknown C type '{}' for printf formatter", ltcir_type);
@@ -55,6 +56,7 @@ pub fn convert_type(ltcir_type: &str) -> &str { // this function converts a ltci
         "string" => "string",
         "boolean" => "bool",
         "char" => "char",
+        "ptr" => "void*",
         _ => {
             println!("Error: Unknown type '{}'", ltcir_type);
             std::process::exit(1);

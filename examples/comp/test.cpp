@@ -14,26 +14,21 @@
 #define string std::string
 int main(void);
 void ltc_main(void* ret);
-void ltcadd(void* ret, i32 arg0, i32 arg1);
-void stringrettest(void* ret);
 int main(void) {
 	i32 return_value;
 	ltc_main(&return_value);
 	exit(return_value);
 }
 void ltc_main(void* ret) {
-	string retval;
-	stringrettest(&retval);
+	void* exam;
+	exam = calloc(100, 1);
 
-	std::cout << retval << "\n";
+	u8 test;
+
+	((u8*)exam)[0] = 50;
+	test = ((u8*)exam)[0];
+	std::cout << test << "\n";
+	free(exam);
 
 	*(i32*)ret = 0;
-}
-void ltcadd(void* ret, i32 arg0, i32 arg1) {
-	i32 test;
-	test = arg0 + arg1;
-	*(i32*)ret = test;
-}
-void stringrettest(void* ret) {
-	*(string*)ret = "hello world";
 }

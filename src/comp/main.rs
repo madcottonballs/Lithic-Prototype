@@ -8,9 +8,14 @@ use std::collections::HashMap;
 use std::fs;
 
 /*
-IMPORTANT INFO
+MISSING/BUGS:
+    variables of type u8 or i8 are being printed as if theyre cpp unsigned char type because of how cpp prints ints
+
+IMPORTANT 
 
 run a test using the command "python "src\comp\test.py""
+
+to add new functions, add the keyword to compiler.keywords
 
 tokens is a Vec<Token>
 the Token class has 
@@ -94,6 +99,11 @@ impl Compiler {
                 "not".into(),
 
                 "typeof".into(),
+
+                "malloc".into(),
+                "get_at".into(),
+                "set_at".into(),
+                "free".into(),
                 ],
             type_names: vec![
                 "i32".into(),
@@ -107,6 +117,7 @@ impl Compiler {
                 "string".into(),
                 "boolean".into(),
                 "char".into(),
+                "ptr".into(),
             ],
             target: Vec::new(),
             variable_types: HashMap::new(),
@@ -141,6 +152,7 @@ fn resolve_typeof_type(token: &Token, compiler: &Compiler) -> String {
         "u8" => "u8".to_string(),
         "boolean" => "boolean".to_string(),
         "char" => "char".to_string(),
+        "ptr" => "ptr".to_string(),
         _ => {
             println!(
                 "Error: 'typeof' does not support token '{}' of parser type '{}'",

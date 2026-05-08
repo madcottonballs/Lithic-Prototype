@@ -617,7 +617,7 @@ def resolve_malloc(tokens, i, ltc) -> None:
     
     ltc.helper.malloc(arg.val, ltc)
 
-    tokens[i] = ltc.t.ptr(ltc.hp) 
+    tokens[i] = ltc.t.ptr(ltc.hp, ltc) 
 
 def resolve_split(tokens, i, ltc) -> None:
     t = ltc.t

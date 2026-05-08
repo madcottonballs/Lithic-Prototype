@@ -1,0 +1,6 @@
+define main() {
+    let ptr x = malloc(5);
+    @(x, u8, 0) = 100;
+    printf(@(x, u8, 0));
+    return(0);
+}
