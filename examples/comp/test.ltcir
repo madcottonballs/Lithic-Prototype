@@ -5,19 +5,12 @@ define #main
 end #main
 
 define #ltc_main
-    make_var boolean -> %loop
-    mov |true -> %loop
-    make_var i32 -> %counter
-    mov 0 -> %counter
+    make_array i32 $3 -> %arrtest
+    set_at $7 -> %arrtest i32 $0
+    set_at $11 -> %arrtest i32 $1
 
-while %loop
-{
-    add %counter 1 -> %counter
-    less %counter 50 -> %loop
-    printf %counter
-    inlinecpp "int x = 5;"
-    inlineasm "nop"
-}
+    make_var tuple<i32,string> -> %pair
+    
 
     ret i32 $0
 end #ltc_main

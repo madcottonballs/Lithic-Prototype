@@ -1,7 +1,1 @@
-define main() {
-    printf(ltcadd(5, 10));
-    return(0);
-}
-define ltcadd(i32 a, i32 b) {
-    return(a + b);
-}
+printf(5);

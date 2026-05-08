@@ -24,6 +24,8 @@
 ###     char
 ###     boolean
 ###     ptr
+###     tuple: tuple<type, type>
+###     array:  type[size]
 
 ## Info
 *       Entry point is the #main function.
@@ -31,6 +33,7 @@
 *       To return a value from the #main function, you must use exit [any], NOT ret [type] [any]
 *       No errors but syntax errors are checked for.
 *       The star '*' is used to denote comments
+*       String, array, and tuple indexing are done using the get_at and set_at instructions. offsets for tuples have to be manually entered.
 
 
 ## Arithmatic
@@ -65,12 +68,21 @@ All data in block is initalized to 0.
 void* under the hood.
 ###     get_at var type integer -> var
 Casts the ptr to the specified type, then returns the indexed value in the ptr's memory.
+Also used for arrays.
 Ex:
 ```
 get_at %ptr_var u8 0 -> %dest_var
+
 ```
 ###     set_at any -> var type integer
 Casts the ptr to the specified type, then sets the indexed value in the ptr's memory.
+Also used for arrays.
+Ex:
+```
+make_array i32 $3 -> %arrtest
+set_at $7 -> %arrtest i32 $0
+set_at $11 -> %arrtest i32 $1
+```
 ###     free var
 De-reserves the memory the ptr var references.
 ###     loc any -> var
@@ -93,14 +105,18 @@ Closes a block.
 
 ###     make_var type -> var
         Initalizes a variable with that type.
+ex:
+```
+make_var tuple<i32,string> -> %pair
+```
 
 ###     mov any -> var
         Sets an existing variable to have the value of arg 1.
 ###     typeof any -> var
         Loads the type of the data entered into the variable as a string.
-###    *inlineCpp string
+###     inlinecpp string
         Writes the text entered into the generated C++ file.
-###    *inlineAsm string
+###     inlineasm string
         Writes the text entered into the generated Asm file.
 ## file IO
 ###   *file_open [string] [string] -> [file]

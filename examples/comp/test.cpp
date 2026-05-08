@@ -1,7 +1,6 @@
+#include <tuple>
 #include <string>
-#include <iostream>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #define i32 int32_t
 #define u32 uint32_t
@@ -20,19 +19,12 @@ int main(void) {
 	exit(return_value);
 }
 void ltc_main(void* ret) {
-	bool loop;
-	loop = true;
-	i32 counter;
-	counter = 0;
+	i32 arrtest[3];
+	((i32*)arrtest)[0] = 7;
+	((i32*)arrtest)[1] = 11;
 
-while (loop)
-{{
-	counter = counter + 1;
-	loop = counter < 50;
-	std::cout << counter << "\n";
-	int x = 5; 
-	asm("nop");
-}}
+	std::tuple<i32, string> pair;
+
 
 	*(i32*)ret = 0;
 }

@@ -60,6 +60,7 @@ struct Compiler {
     using_stdint: bool,
     using_iostream: bool,
     using_string: bool,
+    using_tuple: bool,
 }
 
 impl Compiler {
@@ -89,6 +90,7 @@ impl Compiler {
                 
                 "mov".into(),
                 "make_var".into(),
+                "make_array".into(),
                 
                 "exit".into(),
                 
@@ -127,6 +129,8 @@ impl Compiler {
                 "boolean".into(),
                 "char".into(),
                 "ptr".into(),
+                "array".into(),
+                "tuple".into(),
             ],
             target: Vec::new(),
             variable_types: HashMap::new(),
@@ -135,6 +139,7 @@ impl Compiler {
             using_stdint: true,
             using_iostream: false,
             using_string: true,
+            using_tuple: true,
         }
     }
 }

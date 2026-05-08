@@ -3,7 +3,7 @@ import os
 last_exit_code = 0
 
 if last_exit_code == 0:
-    last_exit_code = os.system("rustc src\\comp\\main.rs -o src\\comp\\ltcirc.exe")
+    last_exit_code = os.system("rustc src\\comp\\ltcir\\main.rs -o src\\comp\\ltcirc.exe")
     print(f"--- AUTO COMPILER --- main.rs -> ltcirc.exe:     {last_exit_code}")
 
 if last_exit_code == 0:

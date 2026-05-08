@@ -111,16 +111,28 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             let src = &tokens[1].value;
             target_line = format!("\t{} = {};", dest, src);  // generate C code for mov instruction
         }
-        "make_var" => {
+        "make_var" => { // make_var type -> var 
             if tokens.len() != 4 {
                 println!("Error: 'make_var' instruction requires exactly 4 tokens, instead recieved {}", tokens.len());
                 std::process::exit(1);
             } // beyond this, assume the instruction is well-formed
             let var_name = &tokens[3].value;
             let var_type = &tokens[1].value;
-            compiler.variable_types.insert(var_name.clone(), var_type.clone());
+            compiler.variable_types.insert(var_name.clone(), var_type.clone()); // save name:type metadata
             target_line = format!("\t{} {};", helper::convert_type(var_type), var_name);  // generate C code for variable declaration
         }
+        "make_array" => { // make_array type size -> var
+            if tokens.len() != 5 {
+                println!("Error: 'make_array' instruction requires exactly 5 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let var_name = &tokens[4].value;
+            let var_type = &tokens[1].value;
+            let size = &tokens[2].value;
+            compiler.variable_types.insert(var_name.clone(), "array".into()); // save name:type metadata
+            target_line = format!("\t{} {}[{}];", helper::convert_type(var_type), var_name, size);  // generate C code for array declaration
+        }
+
         "typeof" => {
             if tokens.len() != 4 {
                 println!("Error: 'typeof' instruction requires exactly 4 tokens, instead recieved {}", tokens.len());

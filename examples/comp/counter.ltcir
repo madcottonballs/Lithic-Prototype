@@ -1,0 +1,21 @@
+define #main
+    make_var i32 -> %return_value
+    call #ltc_main -> %return_value
+    exit %return_value
+end #main
+
+define #ltc_main
+    make_var boolean -> %loop
+    mov |true -> %loop
+    make_var i32 -> %counter
+    mov 0 -> %counter
+
+while %loop
+{
+    add %counter 1 -> %counter
+    less %counter 50 -> %loop
+    printf %counter
+}
+
+    ret i32 $0
+end #ltc_main
