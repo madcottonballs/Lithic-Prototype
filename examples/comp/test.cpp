@@ -20,15 +20,19 @@ int main(void) {
 	exit(return_value);
 }
 void ltc_main(void* ret) {
-	void* exam;
-	exam = calloc(100, 1);
+	bool loop;
+	loop = true;
+	i32 counter;
+	counter = 0;
 
-	u8 test;
-
-	((u8*)exam)[0] = 50;
-	test = ((u8*)exam)[0];
-	std::cout << test << "\n";
-	free(exam);
+while (loop)
+{{
+	counter = counter + 1;
+	loop = counter < 50;
+	std::cout << counter << "\n";
+	int x = 5; 
+	asm("nop");
+}}
 
 	*(i32*)ret = 0;
 }

@@ -27,6 +27,7 @@
 
 ## Info
 *       Entry point is the #main function.
+*       A star in the docs denotes an unfinished feature.
 *       To return a value from the #main function, you must use exit [any], NOT ret [type] [any]
 *       No errors but syntax errors are checked for.
 *       The star '*' is used to denote comments
@@ -60,11 +61,33 @@ Prints a newline character after the input is read.
 ## Memory
 ###     malloc integer_lit -> var
 Allocates n number of bytes and saves it as a ptr.
+All data in block is initalized to 0.
 void* under the hood.
 ###     get_at var type integer -> var
 Casts the ptr to the specified type, then returns the indexed value in the ptr's memory.
+Ex:
+```
+get_at %ptr_var u8 0 -> %dest_var
+```
 ###     set_at any -> var type integer
 Casts the ptr to the specified type, then sets the indexed value in the ptr's memory.
+###     free var
+De-reserves the memory the ptr var references.
+###     loc any -> var
+Sets the var to the address of the first argument.
+Used for creating ptr's.
+
+## Control flow
+###     if boolean
+Runs the code in the block if the boolean is true.
+###     ifnot boolean
+Runs the code in the block if the boolean is false.
+###     while boolean
+Runs the code in the block as long as the boolean is true.
+###     {
+Opens a block.
+###     }
+Closes a block.
 
 ## misc functions
 

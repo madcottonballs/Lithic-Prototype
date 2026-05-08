@@ -347,7 +347,16 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             let free = &tokens[1].value;
             target_line = format!("\tfree({});", free);  // generate C code for free instruction
             }
-
+        "loc" => // loc [any] -> [dest_var]
+            {
+            if tokens.len() != 4 {
+                println!("Error: 'loc' instruction requires exactly 4 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+            let dest = &tokens[3].value;
+            let origin = &tokens[1].value;
+            target_line = format!("\t{} = &{};", dest, origin);  // generate C code for loc
+            }
         "get_at" => // get_at [var] [type] [integer] -> [dest_var]
             {
             if tokens.len() != 6 {
@@ -371,10 +380,69 @@ pub fn compile_line(tokens: &Vec<Token>, compiler: &mut Compiler) {
             let _type = &tokens[4].value;
             let origin = &tokens[1].value;
             target_line = format!("\t(({}*){})[{}] = {};", _type, dest, idx, origin);  // generate C code for get_at instruction
+        }
+        "if" => { // if [boolean]
+            if tokens.len() != 2 {
+                println!("Error: 'if' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+                    
+            target_line = format!("if ({})",  tokens[1].value); 
+            }
+        "while" => { // while [boolean]
+            if tokens.len() != 2 {
+                println!("Error: 'while' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+                    
+            target_line = format!("while ({})",  tokens[1].value); 
             }
 
+        "ifnot" => { // ifnot [boolean]
+            if tokens.len() != 2 {
+                println!("Error: 'ifnot' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+                    
+            target_line = format!("if (!{})",  tokens[1].value);  
+            }
+        "}" => { // }
+            if tokens.len() != 1 {
+                println!("Error: '}}' instruction requires exactly 1 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+                    
+            target_line = "}}".into();  
+            }
+        "{" => { // {
+            if tokens.len() != 1 {
+                println!("Error: '{{' instruction requires exactly 1 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+                    
+            target_line = "{{".into();  
+        }
+        "inlinecpp" => { // inlinecpp [string]
+            if tokens.len() != 2 {
+                println!("Error: 'inlinecpp' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
 
-        _ => {
+
+            target_line = format!("\t{}",  tokens[1].value.trim_matches('\"'));  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+
+            }
+        "inlineasm" => { // inlinecpp [string]
+            if tokens.len() != 2 {
+                println!("Error: 'inlinecpp' instruction requires exactly 2 tokens, instead recieved {}", tokens.len());
+                std::process::exit(1);
+            } // beyond this, assume the instruction is well-formed
+
+
+            target_line = format!("\tasm({});",  tokens[1].value);  // generate C code for print instruction, this assumes we're printing an integer, for simplicity
+
+        }
+            _ => {
             println!("Error: Unknown keyword '{}'", tokens[0].value);
             std::process::exit(1);
         }

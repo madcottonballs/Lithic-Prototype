@@ -5,15 +5,19 @@ define #main
 end #main
 
 define #ltc_main
-    make_var ptr -> %exam
-    malloc 100 -> %exam
+    make_var boolean -> %loop
+    mov |true -> %loop
+    make_var i32 -> %counter
+    mov 0 -> %counter
 
-    make_var u8 -> %test
-
-    set_at 50 -> %exam u8 0
-    get_at %exam u8 0 -> %test
-    printf %test
-    free %exam
+while %loop
+{
+    add %counter 1 -> %counter
+    less %counter 50 -> %loop
+    printf %counter
+    inlinecpp "int x = 5;"
+    inlineasm "nop"
+}
 
     ret i32 $0
 end #ltc_main

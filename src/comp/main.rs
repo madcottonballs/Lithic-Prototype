@@ -80,8 +80,9 @@ impl Compiler {
                 "input".into(),
                 "flush".into(),
                 
-                "inlineCpp".into(),
-                
+                "inlinecpp".into(),
+                "inlineasm".into(),
+
                 "define".into(),
                 "end".into(),
                 "call".into(),
@@ -104,6 +105,14 @@ impl Compiler {
                 "get_at".into(),
                 "set_at".into(),
                 "free".into(),
+                "loc".into(),
+                
+                "if".into(),
+                "ifnot".into(),
+                "while".into(),
+                "{".into(),
+                "}".into(),
+
                 ],
             type_names: vec![
                 "i32".into(),
